@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+# Preferences
+.vscode
+.cache
+.clangd
+
+# CMake outputs
+build
+
+# vcpkg
+vcpkg_installed
