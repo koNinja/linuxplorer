@@ -1,4 +1,4 @@
-#include <shell/filesystem/cloud_provider_registrar.h>
+#include <shell/filesystem/cloud_provider_registrar.hpp>
 
 #include <windows.h>
 #include <cfapi.h>

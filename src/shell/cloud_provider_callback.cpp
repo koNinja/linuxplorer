@@ -1,4 +1,4 @@
-#include <shell/cloud_provider_callback.h>
+#include <shell/cloud_provider_callback.hpp>
 
 namespace linuxplorer::shell {
 	cloud_provider_callback::cloud_provider_callback(cloud_provider_callback_type type, cloud_provider_callback_t callback)

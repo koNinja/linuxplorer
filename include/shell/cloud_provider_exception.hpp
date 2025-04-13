@@ -5,13 +5,12 @@
 #include <winerror.h>
 
 namespace linuxplorer::shell {
-	class cloud_provider_exception : public std::runtime_error {
+	class cloud_provider_runtime_exception : public std::runtime_error {
 	protected:
-		::HRESULT m_hresult;
 	public:
-		explicit cloud_provider_exception(const char* message, ::HRESULT hresult) : std::runtime_error(message) {}
-		explicit cloud_provider_exception(const std::string& message, ::HRESULT hresult) : std::runtime_error(message) {}
-		virtual ~cloud_provider_exception() noexcept = default;
+		explicit cloud_provider_runtime_exception(const char* message) : std::runtime_error(message) {}
+		explicit cloud_provider_runtime_exception(const std::string& message) : std::runtime_error(message) {}
+		virtual ~cloud_provider_runtime_exception() noexcept = default;
 	};
 }
 
