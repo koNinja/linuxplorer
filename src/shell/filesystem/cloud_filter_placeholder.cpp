@@ -62,8 +62,10 @@ namespace linuxplorer::shell::filesystem {
 	}
 
 	cloud_filter_placeholder cloud_filter_placeholder::create(const cloud_provider_session& session, std::wstring_view relative_path, const ::CF_FS_METADATA& metadata) {		
-		auto filename = relative_path.substr(relative_path.find_last_of(L"\\") + 1);
-		auto dirname = relative_path.substr(0, relative_path.find_last_of(L"\\"));
+		auto filename = relative_path.substr(relative_path.find_last_of(L'\\') + 1);
+		std::size_t dir_file_separator_pos = relative_path.find_last_of(L'\\');
+		std::size_t dirname_substr_count = dir_file_separator_pos == std::wstring_view::npos ? 0 : dir_file_separator_pos;
+		auto dirname = relative_path.substr(0, dirname_substr_count);
 		
 		::CF_PLACEHOLDER_CREATE_INFO create_info;
 		create_info.RelativeFileName = filename.data();
@@ -221,7 +223,7 @@ namespace linuxplorer::shell::filesystem {
 			default:
 				throw std::runtime_error("Invalid placeholder type.");
 		}
-		succeeded = deleter(placeholder.m_relative_path.c_str());
+		succeeded = deleter(path.c_str());
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
 			throw std::system_error(ec, "Failed to remove the placeholder.");

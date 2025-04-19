@@ -6,40 +6,42 @@
 
 #include "cftest_impl.h"
 
+#include <thread>
+
 constexpr const wchar_t* sync_root_path = L"C:\\Users\\koNinja\\desktop\\client";
 constexpr const wchar_t* provider_name = L"MyProvider";
 constexpr const wchar_t* provider_version = L"1.0.0";
 
+using namespace linuxplorer::shell;
+
 TEST(registrar, register) {
-	linuxplorer::shell::filesystem::cloud_provider_registrar::register_provider(sync_root_path, provider_name, provider_version);
+	filesystem::cloud_provider_registrar::register_provider(sync_root_path, provider_name, provider_version);
 }
 
 TEST(registrar, unregister) {
-	linuxplorer::shell::filesystem::cloud_provider_registrar::unregister_provider(sync_root_path);
+	filesystem::cloud_provider_registrar::unregister_provider(sync_root_path);
 }
 
 TEST(placeholders, create_directory) 
 {
-	linuxplorer::shell::cloud_provider_session ss(sync_root_path);
+	cloud_provider_session ss(sync_root_path);
 
-	ss.register_callback(linuxplorer::shell::cloud_provider_callback(linuxplorer::shell::cloud_provider_callback_type::fetch_data, cftest::on_fetch_data));
+	ss.register_callback(cloud_provider_callback(cloud_provider_callback_type::fetch_data, cftest::on_fetch_data));
 
 	ss.connect();
 
 	::FILE_BASIC_INFO metadata;
 	ZeroMemory(&metadata, sizeof(::FILE_BASIC_INFO));
 
-	auto ph = linuxplorer::shell::filesystem::cloud_filter_placeholder::create_directory(ss, L"sampledir", metadata);
+	auto ph = filesystem::cloud_filter_placeholder::create_directory(ss, L"sampledir", metadata);
 
-	linuxplorer::shell::filesystem::cloud_filter_placeholder::remove(ss, std::move(ph));
+	filesystem::cloud_filter_placeholder::remove(ss, std::move(ph));
 
 	ss.disconnect();
 }
 
 TEST(placeholders, create_placeholder) {
-	linuxplorer::shell::cloud_provider_session ss(sync_root_path);
-
-	ss.register_callback(linuxplorer::shell::cloud_provider_callback(linuxplorer::shell::cloud_provider_callback_type::fetch_data, cftest::on_fetch_data));
+	cloud_provider_session ss(sync_root_path);
 
 	ss.connect();
 
@@ -47,11 +49,35 @@ TEST(placeholders, create_placeholder) {
 	ZeroMemory(&file_metadata, sizeof(::CF_FS_METADATA));
 	ZeroMemory(&directory_metadata, sizeof(::CF_FS_METADATA));
 
-	auto dir = linuxplorer::shell::filesystem::cloud_filter_placeholder::create_directory(ss, L"sampledir", directory_metadata.BasicInfo);
-	auto ph = linuxplorer::shell::filesystem::cloud_filter_placeholder::create(ss, L"sampledir\\sample.txt", file_metadata);
+	auto dir = filesystem::cloud_filter_placeholder::create_directory(ss, L"sampledir", directory_metadata.BasicInfo);
+	auto ph = filesystem::cloud_filter_placeholder::create(ss, L"sampledir\\sample.txt", file_metadata);
 
-	ph.remove(ss, std::move(ph));
-	//linuxplorer::shell::filesystem::cloud_filter_placeholder::remove(ss, std::move(ph));
+	filesystem::cloud_filter_placeholder::remove(ss, std::move(ph));
+
+	ss.disconnect();
+}
+
+TEST(placeholders, transfer_data) {
+	linuxplorer::shell::cloud_provider_session ss(sync_root_path);
+
+	ss.register_callback(cloud_provider_callback(cloud_provider_callback_type::fetch_data, cftest::on_fetch_data));
+	ss.connect();
+
+	::CF_FS_METADATA metadata;
+	ZeroMemory(&metadata, sizeof(::CF_FS_METADATA));
+	metadata.FileSize.QuadPart = sizeof(cftest::dummy_data);
+
+	auto ph = filesystem::cloud_filter_placeholder::create(ss, L"sample.txt", metadata);
+	ph.hydrate();
+
+	// watch a hydration request every 0.5s for 50s .
+	/*
+	for (int i = 0; i < 100; i++) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
+	*/
+
+	filesystem::cloud_filter_placeholder::remove(ss, std::move(ph));
 
 	ss.disconnect();
 }
