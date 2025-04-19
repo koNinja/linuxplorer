@@ -1,7 +1,7 @@
 #ifndef CLOUD_PROVIDER_REGISTRAR_H
 #define CLOUD_PROVIDER_REGISTRAR_H
 
-#include <shell/cloud_provider_session.h>
+#include <shell/cloud_provider_session.hpp>
 #include <string_view>
 
 namespace linuxplorer::shell::filesystem {

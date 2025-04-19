@@ -1,7 +1,7 @@
 #ifndef CLOUD_PROVIDER_SESSION_H
 #define CLOUD_PROVIDER_SESSION_H
 
-#include <shell/cloud_provider_callback.h>
+#include <shell/cloud_provider_callback.hpp>
 
 #include <string>
 #include <string_view>
@@ -23,13 +23,13 @@ namespace linuxplorer::shell {
 		cloud_provider_session& operator=(cloud_provider_session&& right);
 		virtual ~cloud_provider_session() noexcept;
 
-		void register_callback(const cloud_provider_callback& callback);
-		void register_callbacks(const std::vector<cloud_provider_callback>& callbacks);
+		void register_callback(const cloud_provider_callback& callback) noexcept;
+		void register_callbacks(const std::vector<cloud_provider_callback>& callbacks) noexcept;
 
 		void connect();
 		void disconnect();
 
-		std::wstring_view get_sync_root_dir() const;
+		std::wstring_view get_sync_root_dir() const noexcept;
 	};
 }
 
