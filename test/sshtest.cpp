@@ -6,6 +6,8 @@
 #include <libssh2_sftp.h>
 #include <fstream>
 
+#include <util/charset/multibyte_wide_compat_helper.hpp>
+
 using namespace linuxplorer::ssh;
 
 TEST(session_test, write) {

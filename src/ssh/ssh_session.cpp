@@ -69,7 +69,7 @@ namespace linuxplorer::ssh {
 
 	void ssh_session::connect(bool ignore_known_hosts) {
 		if (this->m_state != ssh_session_state::connectable) {
-			throw std::logic_error("Session is not in a state to connect.");
+			throw std::runtime_error("Session is not in a state to connect.");
 		}
 
 		int result = ::connect(this->m_socket, this->get_sockaddr_ptr(), this->get_sockaddr_length());
@@ -110,7 +110,7 @@ namespace linuxplorer::ssh {
 
 	void ssh_session::authenticate(std::string_view username, std::string_view password) {
 		if (this->m_state != ssh_session_state::need_to_authenticate) {
-			throw std::logic_error("Session is not in a state to authenticate.");
+			throw std::runtime_error("Session is not in a state to authenticate.");
 		}
 
 		this->m_username = username.data();
@@ -125,7 +125,7 @@ namespace linuxplorer::ssh {
 
 	void ssh_session::disconnect(std::string_view description) {
 		if (this->m_state == ssh_session_state::connected) {
-				throw std::logic_error("Session is not in a state to disconnect.");
+			throw std::runtime_error("Session is not in a state to disconnect.");
 		}
 
 		::libssh2_session_disconnect(this->m_session, description.data());
