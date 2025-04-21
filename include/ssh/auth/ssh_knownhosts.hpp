@@ -21,24 +21,24 @@ namespace linuxplorer::ssh::auth {
 		missing
 	};
 
-	constexpr const char* default_knownhosts_path = "<default_path>";
+	constexpr const wchar_t* default_knownhosts_path = L"<default_path>";
 	
 	class ssh_knownhosts {
 		using ssh_knownhosts_ptr_t = std::unique_ptr<::LIBSSH2_KNOWNHOSTS, internal::ssh_knownhosts_ptr_delete>;
 		const ssh_session& m_session;
 		ssh_knownhosts_ptr_t m_knownhosts;
-		std::string m_knownhosts_path;
+		std::wstring m_knownhosts_path;
 
 		void write(::libssh2_knownhost* target) const;
 	public:
-		ssh_knownhosts(const ssh_session& host, std::string_view path = default_knownhosts_path);
+		ssh_knownhosts(const ssh_session& host, std::wstring_view path = default_knownhosts_path);
 
 		ssh_knownhosts(const ssh_knownhosts&) = delete;
 		ssh_knownhosts& operator=(const ssh_knownhosts&) = delete;
 		ssh_knownhosts(ssh_knownhosts&&) = delete;
 		ssh_knownhosts& operator=(ssh_knownhosts&&) = delete;
 
-		void add(std::string_view comment = "");
+		void add(std::wstring_view comment = L"");
 		void remove();
 		ssh_knownhosts_check_result check() const;
 

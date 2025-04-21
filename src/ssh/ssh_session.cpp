@@ -4,6 +4,7 @@
 #include <ssh/auth/ssh_knownhosts.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <ssh/internal/ssh_library_resource_manager.hpp>
+#include <util/charset/multibyte_wide_compat_helper.hpp>
 
 namespace linuxplorer::ssh {
 	const ::sockaddr* ssh_session::get_sockaddr_ptr() const noexcept {
@@ -108,14 +109,16 @@ namespace linuxplorer::ssh {
 		this->m_state = ssh_session_state::need_to_authenticate;
 	}
 
-	void ssh_session::authenticate(std::string_view username, std::string_view password) {
+	void ssh_session::authenticate(std::wstring_view username, std::wstring_view password) {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
 		if (this->m_state != ssh_session_state::need_to_authenticate) {
 			throw std::runtime_error("Session is not in a state to authenticate.");
 		}
 
 		this->m_username = username.data();
 
-		int result = libssh2_userauth_password(this->m_session, username.data(), password.data());
+		int result = libssh2_userauth_password(this->m_session, charset_helper::convert_wide_to_multibyte(username).c_str(), charset_helper::convert_wide_to_multibyte(password).c_str());
 		if (result != 0) {
 			throw ssh_libssh2_exception(result, "Failed to authenticate.");
 		}
@@ -123,12 +126,14 @@ namespace linuxplorer::ssh {
 		this->m_state = ssh_session_state::connected;
 	}
 
-	void ssh_session::disconnect(std::string_view description) {
-		if (this->m_state == ssh_session_state::connected) {
+	void ssh_session::disconnect(std::wstring_view description) {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
+		if (this->m_state != ssh_session_state::connected) {
 			throw std::runtime_error("Session is not in a state to disconnect.");
 		}
 
-		::libssh2_session_disconnect(this->m_session, description.data());
+		::libssh2_session_disconnect(this->m_session, charset_helper::convert_wide_to_multibyte(description).c_str());
 		::libssh2_session_free(this->m_session);
 
 		this->m_state = ssh_session_state::disconnected;

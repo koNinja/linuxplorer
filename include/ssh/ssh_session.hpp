@@ -29,7 +29,7 @@ namespace linuxplorer::ssh {
 		std::variant<::sockaddr_in, ::sockaddr_in6> m_socket_addr;
 
 		ssh_address m_host;
-		std::string m_username;
+		std::wstring m_username;
 		ssh_session_state m_state;
 
 		const ::sockaddr* get_sockaddr_ptr() const noexcept;
@@ -38,8 +38,8 @@ namespace linuxplorer::ssh {
 		ssh_session(const ssh_address& host, std::uint16_t port = default_ssh_port);
 
 		void connect(bool ignore_known_hosts = false);
-		void authenticate(std::string_view username, std::string_view password);
-		void disconnect(std::string_view description = "");
+		void authenticate(std::wstring_view username, std::wstring_view password);
+		void disconnect(std::wstring_view description = L"");
 
 		std::uint16_t get_port() const noexcept;
 		const ssh_address& get_host() const noexcept;

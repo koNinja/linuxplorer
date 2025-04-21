@@ -1,16 +1,20 @@
 #include <ssh/ssh_address.hpp>
 
+#include <util/charset/multibyte_wide_compat_helper.hpp>
+
 #include <ws2tcpip.h>
 #include <regex>
 
 namespace linuxplorer::ssh {
-	ssh_address::ssh_address(std::string_view address) {
+	ssh_address::ssh_address(std::wstring_view address) {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
 		this->m_str_addr = address;
 
-		std::regex ipv4_pattern(R"(^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$)");
-		std::regex ipv6_pattern(R"(^([0-9a-fA-F]{1,4}:){7}([0-9a-fA-F]{1,4})$|^([0-9a-fA-F]{1,4}:){1,7}:$|^:([0-9a-fA-F]{1,4}:){1,6}$|^([0-9a-fA-F]{1,4}:){0,5}:([0-9a-fA-F]{1,4}:){1,6}$)");
+		std::wregex ipv4_pattern(LR"(^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$)");
+		std::wregex ipv6_pattern(LR"(^([0-9a-fA-F]{1,4}:){7}([0-9a-fA-F]{1,4})$|^([0-9a-fA-F]{1,4}:){1,7}:$|^:([0-9a-fA-F]{1,4}:){1,6}$|^([0-9a-fA-F]{1,4}:){0,5}:([0-9a-fA-F]{1,4}:){1,6}$)");
 
-		std::match_results<std::string_view::const_iterator> match;
+		std::match_results<decltype(address)::const_iterator> match;
 		if (std::regex_match(address.cbegin(), address.cend(), match, ipv4_pattern)) {
 			for (size_t i = 1; i <= 4; ++i) {
 				int part = std::stoi(match[i]);
@@ -20,12 +24,12 @@ namespace linuxplorer::ssh {
 			}
 
 			::in_addr bin_addr;
-			int result = ::inet_pton(AF_INET, address.data(), &bin_addr);
+			int result = ::inet_pton(AF_INET, charset_helper::convert_wide_to_multibyte(address).c_str(), &bin_addr);
 			this->m_bin_addr = bin_addr;
 		}
 		else if (std::regex_match(address.cbegin(), address.cend(), ipv6_pattern)) {
 			::in_addr6 bin_addr;
-			int result = ::inet_pton(AF_INET6, address.data(), &bin_addr);
+			int result = ::inet_pton(AF_INET6, charset_helper::convert_wide_to_multibyte(address).c_str(), &bin_addr);
 			this->m_bin_addr = bin_addr;
 		}
 		else {
@@ -40,7 +44,7 @@ namespace linuxplorer::ssh {
 		else return ssh_address_type::ipv6;
 	}
 
-	std::string_view ssh_address::get_string_address() const noexcept {
+	std::wstring_view ssh_address::get_string_address() const noexcept {
 		return this->m_str_addr;
 	}
 

@@ -5,23 +5,27 @@
 #include <ssh/ssh_exception.hpp>
 #include <fstream>
 
+#include <util/charset/multibyte_wide_compat_helper.hpp>
+
 namespace linuxplorer::ssh::auth {
-	ssh_knownhosts::ssh_knownhosts(const ssh_session& session, std::string_view path) : m_session(session) {
+	ssh_knownhosts::ssh_knownhosts(const ssh_session& session, std::wstring_view path) : m_session(session) {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
 		if (path.compare(default_knownhosts_path) == 0) {
-			std::int32_t userprofile_path_length = ::GetEnvironmentVariableA("USERPROFILE", nullptr, 0);
+			std::int32_t userprofile_path_length = ::GetEnvironmentVariableW(L"USERPROFILE", nullptr, 0);
 			if (userprofile_path_length == 0) {
 				std::error_code ec(::GetLastError(), std::system_category());
 				throw std::system_error(ec, "Failed to get user profile path.");
 			}
 
-			auto userprofile_path = std::make_unique<char[]>(userprofile_path_length);
-			::DWORD ret = ::GetEnvironmentVariableA("USERPROFILE", userprofile_path.get(), userprofile_path_length);
+			auto userprofile_path = std::make_unique<wchar_t[]>(userprofile_path_length);
+			::DWORD ret = ::GetEnvironmentVariableW(L"USERPROFILE", userprofile_path.get(), userprofile_path_length);
 			if (ret == 0) {
 				std::error_code ec(::GetLastError(), std::system_category());
 				throw std::system_error(ec, "Failed to get user profile path.");
 			}
 
-			this->m_knownhosts_path = std::move(std::string(userprofile_path.get()) + "\\.ssh\\known_hosts");
+			this->m_knownhosts_path = std::move(std::wstring(userprofile_path.get()) + L"\\.ssh\\known_hosts");
 		}
 		else {
 			this->m_knownhosts_path = path;
@@ -32,24 +36,26 @@ namespace linuxplorer::ssh::auth {
 			throw ssh_libssh2_exception(::libssh2_session_last_errno(this->m_session.get_session()), "Failed to initialize known hosts.");
 		}
 
-		int result = libssh2_knownhost_readfile(this->m_knownhosts.get(), this->m_knownhosts_path.c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
+		int result = libssh2_knownhost_readfile(this->m_knownhosts.get(), charset_helper::convert_wide_to_multibyte(this->m_knownhosts_path).c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
 		if (result < 0) {
 			throw ssh_libssh2_exception(result, "Failed to read known hosts file.");
 		}
 	}
 
-	void ssh_knownhosts::add(std::string_view comment) {
+	void ssh_knownhosts::add(std::wstring_view comment) {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
 		std::size_t length;
 		int type;
 		const char* fingerprint = ::libssh2_session_hostkey(this->m_session.get_session(), &length, &type);
 
 		int result = ::libssh2_knownhost_addc(
 			this->m_knownhosts.get(),
-			this->m_session.get_host().get_string_address().data(),
+			charset_helper::convert_wide_to_multibyte(this->m_session.get_host().get_string_address()).c_str(),
 			nullptr,
 			fingerprint,
 			length,
-			comment.data(),
+			charset_helper::convert_wide_to_multibyte(comment).c_str(),
 			comment.size(),
 			LIBSSH2_KNOWNHOST_TYPE_PLAIN | LIBSSH2_KNOWNHOST_KEYENC_RAW | LIBSSH2_KNOWNHOST_KEY_SSHDSS,
 			nullptr
@@ -63,7 +69,7 @@ namespace linuxplorer::ssh::auth {
 		int rc;
 		::libssh2_knownhost* store, prev;
 		while ((rc = ::libssh2_knownhost_get(this->m_knownhosts.get(), &store, &prev)) == 0) {
-			if (this->m_session.get_host().get_string_address().compare(store->name) == 0) {
+			if (this->m_session.get_host().get_string_address().compare(charset_helper::convert_multibyte_to_wide(store->name)) == 0) {
 				target = store;
 				break;
 			}
@@ -76,13 +82,15 @@ namespace linuxplorer::ssh::auth {
 	}
 
 	void ssh_knownhosts::remove() {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
 		::libssh2_knownhost* store, prev;
 		int rc;
 		int result;
 		::libssh2_knownhost* target;
 
 		while ((rc = ::libssh2_knownhost_get(this->m_knownhosts.get(), &store, &prev)) == 0) {
-			if (this->m_session.get_host().get_string_address().compare(store->name) == 0) {
+			if (this->m_session.get_host().get_string_address().compare(charset_helper::convert_multibyte_to_wide(store->name)) == 0) {
 				target = store;
 				result = ::libssh2_knownhost_del(this->m_knownhosts.get(), store);
 				break;
@@ -100,6 +108,8 @@ namespace linuxplorer::ssh::auth {
 	}
 
 	ssh_knownhosts_check_result ssh_knownhosts::check() const {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
 		::libssh2_knownhost* entry;
 		std::size_t length;
 		int type;
@@ -108,7 +118,7 @@ namespace linuxplorer::ssh::auth {
 
 		int result = ::libssh2_knownhost_checkp(
 			this->m_knownhosts.get(),
-			this->m_session.get_host().get_string_address().data(),
+			charset_helper::convert_wide_to_multibyte(this->m_session.get_host().get_string_address()).c_str(),
 			this->m_session.get_port(),
 			fingerprint,
 			length,

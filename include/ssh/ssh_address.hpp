@@ -16,14 +16,16 @@ namespace linuxplorer::ssh {
 	};
 
 	class ssh_address {
-		std::string m_str_addr;
+		std::wstring m_str_addr;
 		std::variant<::in_addr, ::in_addr6> m_bin_addr;
 	public:
-		ssh_address(std::string_view address);
+		ssh_address(std::wstring_view address);
+		ssh_address(const ssh_address& left) = default;
+		ssh_address(ssh_address&& right) = default;
 
 		ssh_address_type get_type() const noexcept;
 		
-		std::string_view get_string_address() const noexcept;
+		std::wstring_view get_string_address() const noexcept;
 		
 		std::optional<::in_addr> try_get_address_ipv4() const noexcept;
 		std::optional<::in_addr6> try_get_address_ipv6() const noexcept;
