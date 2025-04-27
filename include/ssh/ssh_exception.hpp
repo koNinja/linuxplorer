@@ -23,6 +23,12 @@ namespace linuxplorer::ssh {
 		}
 	};
 
+	class ssh_libssh2_sftp_exception : public ssh_libssh2_exception {
+	public:
+		ssh_libssh2_sftp_exception(int errc, const std::string& what) : ssh_libssh2_exception(errc, what) {}
+		ssh_libssh2_sftp_exception(int errc, const char* what) : ssh_libssh2_exception(errc, what) {}
+	};
+
 	class ssh_wsa_exception : public ssh_exception {
 	protected:
 		std::int32_t m_errc;
