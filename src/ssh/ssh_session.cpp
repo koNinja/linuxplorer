@@ -31,6 +31,13 @@ namespace linuxplorer::ssh {
 		}
 	}
 
+	ssh_session::ssh_session(ssh_session&& right) noexcept : 
+		m_host(right.m_host), m_session(right.m_session), m_socket(right.m_socket), m_state(right.m_state), m_socket_addr(std::move(right.m_socket_addr)), m_username(std::move(right.m_username)), m_sftp(right.m_sftp)
+	{
+		right.m_session = nullptr;
+		right.m_sftp = nullptr;
+	}
+
 	ssh_session::ssh_session(const ssh_address& host, std::uint16_t port) : m_host(host) {
 		if (!internal::ssh_library_resource_manager::is_wsa_initiated()) {
 			int errc = internal::ssh_library_resource_manager::try_initiate_wsa();
@@ -65,6 +72,13 @@ namespace linuxplorer::ssh {
 				break;
 		}
 
+		this->m_session = ::libssh2_session_init();
+		if (this->m_session == nullptr) {
+			throw ssh_libssh2_exception(-1, "Failed to initialize an SSH session object.");
+		}
+		
+		::libssh2_session_set_blocking(this->m_session, true);
+
 		this->m_state = ssh_session_state::connectable;
 	}
 
@@ -78,13 +92,6 @@ namespace linuxplorer::ssh {
 			throw ssh_wsa_exception(::WSAGetLastError(), "Failed to connect to the SSH server.");
 		}
 
-		this->m_session = ::libssh2_session_init();
-		if (this->m_session == nullptr) {
-			throw ssh_libssh2_exception(-1, "Failed to initialize an SSH session object.");
-		}
-		
-		::libssh2_session_set_blocking(this->m_session, true);
-		
 		result = ::libssh2_session_handshake(this->m_session, this->m_socket);
 		if (result < 0) {
 			throw ssh_libssh2_exception(result, "Failed to perform the SSH handshake.");
@@ -123,6 +130,11 @@ namespace linuxplorer::ssh {
 			throw ssh_libssh2_exception(result, "Failed to authenticate.");
 		}
 
+		this->m_sftp = ::libssh2_sftp_init(this->m_session);
+		if (this->m_sftp == nullptr) {
+			throw ssh_libssh2_exception(::libssh2_session_last_errno(this->m_session), "Failed to initialize an SFTP session object.");
+		}
+
 		this->m_state = ssh_session_state::connected;
 	}
 
@@ -133,8 +145,8 @@ namespace linuxplorer::ssh {
 			throw std::runtime_error("Session is not in a state to disconnect.");
 		}
 
+		::libssh2_sftp_shutdown(this->m_sftp);
 		::libssh2_session_disconnect(this->m_session, charset_helper::convert_wide_to_multibyte(description).c_str());
-		::libssh2_session_free(this->m_session);
 
 		this->m_state = ssh_session_state::disconnected;
 	}
@@ -162,7 +174,21 @@ namespace linuxplorer::ssh {
 		return this->m_session;
 	}
 
+	::LIBSSH2_SFTP* ssh_session::get_sftp() const noexcept {
+		return this->m_sftp;
+	}
+
+	ssh_session_state ssh_session::get_state() const noexcept {
+		return this->m_state;
+	}
+
 	ssh_session::~ssh_session() {
+		if (this->m_state == ssh_session_state::connected) {
+			this->disconnect();
+		}
+		
+		::libssh2_session_free(this->m_session);
+
 		::shutdown(this->m_socket, SD_BOTH);
 		::closesocket(this->m_socket);
 	}

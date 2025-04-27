@@ -22,6 +22,7 @@ namespace linuxplorer::ssh::internal {
 
 		static bool is_wsa_initiated() noexcept;
 		static bool is_libssh2_initiated() noexcept;
+		static bool is_libssh2_sftp_initiated() noexcept;
 	};
 }
 
