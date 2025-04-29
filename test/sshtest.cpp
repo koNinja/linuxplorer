@@ -180,7 +180,7 @@ TEST(sftpstream, read) {
 		throw ssh::ssh_libssh2_exception(::libssh2_sftp_last_error(sftp), "Failed to open a file.");
 	}
 
-	ssh::sftp::sftpbuf buffer(sftp, handle);
+	ssh::sftp::sftpbuf buffer(sftp, handle, ssh::sftp::sftpbuf_used_buffer::out);
 
 	char data[0x1000];
 

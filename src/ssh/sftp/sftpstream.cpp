@@ -4,22 +4,38 @@
 #include <ssh/ssh_exception.hpp>
 
 namespace linuxplorer::ssh::sftp {
-	sftpbuf::sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, std::streamsize buffer_size) {
+	sftpbuf::sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, sftpbuf_used_buffer used_buffer, std::streamsize buffer_size) {
 		this->m_sftp = sftp;
 		this->m_handle = handle;
-		this->m_bufsize = buffer_size;
-
+		this->m_inbuf = nullptr;
+		this->m_outbuf = nullptr;
+		this->m_inbufsize = 0;
+		this->m_outbufsize = 0;
 		this->m_in_seek = 0;
 		this->m_out_seek = 0;
 
 		if (buffer_size < 0) throw std::invalid_argument("Invalid buffer size.");
-		this->m_inbuf = std::make_unique<sftpbuf::char_type[]>(this->m_bufsize);
-		this->m_outbuf = std::make_unique<sftpbuf::char_type[]>(this->m_bufsize);
+
+		switch (used_buffer) {
+		case sftpbuf_used_buffer::inout:
+		case sftpbuf_used_buffer::in:
+			this->m_inbufsize = buffer_size;
+			this->m_inbuf = std::make_unique<sftpbuf::char_type[]>(this->m_inbufsize);
+			if (used_buffer != linuxplorer::ssh::sftp::sftpbuf_used_buffer::inout) break;
+
+		case sftpbuf_used_buffer::out:
+			this->m_outbufsize = buffer_size;
+			this->m_outbuf = std::make_unique<sftpbuf::char_type[]>(this->m_outbufsize);
+			break;
+
+		default:
+			break;
+		}
 
 		::libssh2_sftp_seek64(this->m_handle, 0);
 
 		this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get());
-		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_bufsize);
+		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
 	}
 
 	std::streamsize sftpbuf::xsgetn(sftpbuf::char_type* out, std::streamsize length) {
@@ -45,8 +61,12 @@ namespace linuxplorer::ssh::sftp {
 	}
 
 	sftpbuf::int_type sftpbuf::underflow() {
+		if (!this->m_inbuf) {
+			return sftpbuf::traits_type::eof();
+		}
+
 		::libssh2_sftp_seek64(this->m_handle, this->m_in_seek);
-		auto bytes_read = libssh2_sftp_read(this->m_handle, this->m_inbuf.get(), this->m_bufsize);
+		auto bytes_read = libssh2_sftp_read(this->m_handle, this->m_inbuf.get(), this->m_inbufsize);
 		if (bytes_read < 0) {
 			throw ssh_libssh2_sftp_exception(bytes_read, "Failed to read data.");
 		}
@@ -87,6 +107,10 @@ namespace linuxplorer::ssh::sftp {
 	}
 
 	sftpbuf::int_type sftpbuf::overflow(sftpbuf::int_type ch) {
+		if (!this->m_outbuf) {
+			return sftpbuf::traits_type::eof();
+		}
+
 		sftpbuf::int_type result = sftpbuf::traits_type::not_eof(ch);
 		::libssh2_sftp_seek64(this->m_handle, this->m_out_seek);
 
@@ -96,7 +120,7 @@ namespace linuxplorer::ssh::sftp {
 		}
 
 		this->m_out_seek += bytes_written;
-		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_bufsize);
+		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
 
 		if (!sftpbuf::traits_type::eq_int_type(ch, sftpbuf::traits_type::eof())) {
 			sftpbuf::char_type c = sftpbuf::traits_type::to_char_type(ch);
