@@ -6,6 +6,12 @@
 #include <regex>
 
 namespace linuxplorer::ssh {
+	ssh_address::ssh_address(const ssh_address& left) : m_bin_addr(left.m_bin_addr), m_str_addr(left.m_str_addr)
+	{}
+
+	ssh_address::ssh_address(ssh_address&& right) : m_bin_addr(std::move(right.m_bin_addr)), m_str_addr(std::move(right.m_str_addr))
+	{}
+
 	ssh_address::ssh_address(std::wstring_view address) {
 		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
 

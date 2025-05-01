@@ -175,18 +175,15 @@ TEST(sftpstream, read) {
 	if (sftp == nullptr) {
 		throw ssh::ssh_libssh2_exception(-1, "Failed to initialize an SFTP session.");
 	}
-	::LIBSSH2_SFTP_HANDLE *handle = ::libssh2_sftp_open(sftp, "/home/koninja/libssh2-errno.csv", LIBSSH2_FXF_READ, 0);
-	if (handle == nullptr) {
-		throw ssh::ssh_libssh2_exception(::libssh2_sftp_last_error(sftp), "Failed to open a file.");
+	
+	char data[0x1000];
+	ssh::sftp::isftpstream iss(sftp, "/home/koninja/libssh2-errno.csv");
+
+	std::string str;
+	while (std::getline(iss, str)) {
+		std::cout << str << std::endl;
 	}
 
-	ssh::sftp::sftpbuf buffer(sftp, handle, ssh::sftp::sftpbuf_used_buffer::out);
-
-	char data[0x1000];
-
-	buffer.sgetn(data, 1477);
-
-	::libssh2_sftp_close(handle);
 	::libssh2_sftp_shutdown(sftp);
 
 	ss.disconnect();

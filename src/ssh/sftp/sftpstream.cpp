@@ -4,7 +4,21 @@
 #include <ssh/ssh_exception.hpp>
 
 namespace linuxplorer::ssh::sftp {
-	sftpbuf::sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, sftpbuf_used_buffer used_buffer, std::streamsize buffer_size) {
+	sftpbuf::sftpbuf(sftpbuf&& right) {
+		this->m_sftp = right.m_sftp;
+		this->m_handle = right.m_handle;
+		this->m_in_seek = right.m_in_seek;
+		this->m_out_seek = right.m_out_seek;
+		this->m_inbufsize = right.m_inbufsize;
+		this->m_outbufsize = right.m_outbufsize;
+		this->m_inbuf = std::move(right.m_inbuf);
+		this->m_outbuf = std::move(right.m_outbuf);
+		
+		right.m_sftp = nullptr;
+		right.m_handle = nullptr;
+	}
+
+	sftpbuf::sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, std::ios_base::openmode used_buffer, std::streamsize buffer_size) {
 		this->m_sftp = sftp;
 		this->m_handle = handle;
 		this->m_inbuf = nullptr;
@@ -14,22 +28,15 @@ namespace linuxplorer::ssh::sftp {
 		this->m_in_seek = 0;
 		this->m_out_seek = 0;
 
-		if (buffer_size < 0) throw std::invalid_argument("Invalid buffer size.");
+		if (buffer_size <= 0) throw std::invalid_argument("Invalid buffer size.");
 
-		switch (used_buffer) {
-		case sftpbuf_used_buffer::inout:
-		case sftpbuf_used_buffer::in:
+		if (used_buffer & std::ios_base::in) {
 			this->m_inbufsize = buffer_size;
 			this->m_inbuf = std::make_unique<sftpbuf::char_type[]>(this->m_inbufsize);
-			if (used_buffer != linuxplorer::ssh::sftp::sftpbuf_used_buffer::inout) break;
-
-		case sftpbuf_used_buffer::out:
+		}
+		if (used_buffer & std::ios_base::out) {
 			this->m_outbufsize = buffer_size;
 			this->m_outbuf = std::make_unique<sftpbuf::char_type[]>(this->m_outbufsize);
-			break;
-
-		default:
-			break;
 		}
 
 		::libssh2_sftp_seek64(this->m_handle, 0);
@@ -79,7 +86,7 @@ namespace linuxplorer::ssh::sftp {
 		else {
 			this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get() + bytes_read);
 			this->m_in_seek += bytes_read;
-			result = *this->gptr();
+			result = sftpbuf::traits_type::to_int_type(*this->gptr());
 		}
 		
 		return result;
@@ -132,7 +139,7 @@ namespace linuxplorer::ssh::sftp {
 
 			this->m_out_seek += 1;
 
-			result = ch;
+			result = sftpbuf::traits_type::to_int_type(ch);
 		}
 
 		return result;
@@ -140,8 +147,14 @@ namespace linuxplorer::ssh::sftp {
 	
 
 	int sftpbuf::sync() {
-		auto o = this->overflow();
-		auto u = this->underflow();
+		sftpbuf::int_type o = 0, u = 0;
+		
+		if (this->m_inbuf) {
+			u = this->underflow();
+		}
+		if (this->m_outbuf) {
+			o = this->overflow();
+		}
 
 		return -(sftpbuf::traits_type::eq_int_type(o, sftpbuf::traits_type::eof()) || sftpbuf::traits_type::eq_int_type(o, sftpbuf::traits_type::eof()));
 	}
@@ -195,5 +208,50 @@ namespace linuxplorer::ssh::sftp {
 		}
 
 		return pos;
+	}
+
+	isftpstream::isftpstream(isftpstream&& right) : std::basic_istream<char>(nullptr) {
+		this->m_buffer = std::move(right.m_buffer);
+		this->m_handle = right.m_handle;
+
+		this->init(this->m_buffer.get());
+		right.m_handle = nullptr;
+	}
+
+	isftpstream::isftpstream(::LIBSSH2_SFTP* sftp, std::string_view s, std::ios_base::openmode mode, long sftp_posix_permissions_created) : std::basic_istream<char>(nullptr)
+	{
+		unsigned long flags = 0;
+
+		if (mode & std::ios_base::trunc) {
+			flags |= LIBSSH2_FXF_TRUNC;
+		}
+		if (mode & std::ios_base::in) {
+			flags |= LIBSSH2_FXF_READ;
+		}
+		if (mode & std::ios_base::out) {
+			flags |= LIBSSH2_FXF_WRITE;
+		}
+		
+		this->m_handle = ::libssh2_sftp_open_ex(sftp, s.data(), s.length() + sizeof(char), flags, sftp_posix_permissions_created, LIBSSH2_SFTP_OPENFILE);
+		if (!this->m_handle) {
+			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
+		}
+
+		this->m_buffer = std::make_unique<sftpbuf>(sftp, this->m_handle, std::ios_base::in, sftpbuf_default_buffer_size);
+		
+		if (mode & std::ios_base::app) {
+			this->m_buffer->pubseekoff(0, std::ios_base::end, std::ios_base::out);
+		}
+		if (mode & std::ios_base::ate) {
+			this->m_buffer->pubseekoff(0, std::ios_base::end);
+		}
+
+		this->init(this->m_buffer.get());
+	}
+
+	isftpstream::~isftpstream() {
+		if (this->m_handle) {
+			//::libssh2_sftp_close(this->m_handle);
+		}
 	}
 }

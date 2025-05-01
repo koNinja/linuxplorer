@@ -20,8 +20,8 @@ namespace linuxplorer::ssh {
 		std::variant<::in_addr, ::in_addr6> m_bin_addr;
 	public:
 		ssh_address(std::wstring_view address);
-		ssh_address(const ssh_address& left) = default;
-		ssh_address(ssh_address&& right) = default;
+		ssh_address(const ssh_address& left);
+		ssh_address(ssh_address&& right);
 
 		ssh_address_type get_type() const noexcept;
 		

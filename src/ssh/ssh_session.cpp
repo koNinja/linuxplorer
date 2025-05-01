@@ -31,6 +31,12 @@ namespace linuxplorer::ssh {
 		}
 	}
 
+	ssh_session::ssh_session(ssh_session&& right) : 
+		m_host(right.m_host), m_session(right.m_session), m_socket(right.m_socket), m_state(right.m_state), m_socket_addr(std::move(right.m_socket_addr)), m_username(std::move(right.m_username))
+	{
+		right.m_session = nullptr;
+	}
+
 	ssh_session::ssh_session(const ssh_address& host, std::uint16_t port) : m_host(host) {
 		if (!internal::ssh_library_resource_manager::is_wsa_initiated()) {
 			int errc = internal::ssh_library_resource_manager::try_initiate_wsa();

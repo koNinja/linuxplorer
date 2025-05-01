@@ -3,20 +3,13 @@
 
 #include <streambuf>
 #include <iosfwd>
+#include <iostream>
 #include <libssh2_sftp.h>
 
 namespace linuxplorer::ssh::sftp {
 	constexpr std::streamsize sftpbuf_default_buffer_size = 0x1000;
 
-	enum class sftpbuf_used_buffer {
-		in,
-		out,
-		inout
-	};
-
-	class sftpbuf : public std::streambuf {
-		using base = std::streambuf;
-
+	class sftpbuf : public std::basic_streambuf<char> {
 		std::unique_ptr<char_type[]> m_inbuf;
 		std::unique_ptr<char_type[]> m_outbuf;
 		std::streamsize m_inbufsize;
@@ -38,10 +31,21 @@ namespace linuxplorer::ssh::sftp {
 		virtual pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 		virtual pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 	public:
-		sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, sftpbuf_used_buffer used_buffer = sftpbuf_used_buffer::inout, std::streamsize buffer_size = sftpbuf_default_buffer_size);
+		sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, std::ios_base::openmode used_buffer = std::ios_base::in | std::ios_base::out, std::streamsize buffer_size = sftpbuf_default_buffer_size);	
+		sftpbuf(sftpbuf&& right);
 	};
 
-	
+	class isftpstream : public std::basic_istream<char> {
+	protected:
+		::LIBSSH2_SFTP_HANDLE* m_handle;
+		std::unique_ptr<sftpbuf> m_buffer;
+	public:
+		explicit isftpstream(::LIBSSH2_SFTP* sftp, std::string_view s, std::ios_base::openmode mode = std::ios_base::in, long sftp_posix_permissions_created = LIBSSH2_SFTP_S_IFREG | LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IXUSR);
+		explicit isftpstream(const isftpstream&) = delete;
+		explicit isftpstream(isftpstream&& right);
+
+		virtual ~isftpstream();
+	};
 }
 
 #endif // SFTPSTREAM_HPP
