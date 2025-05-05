@@ -4,7 +4,7 @@
 #include <streambuf>
 #include <iosfwd>
 #include <iostream>
-#include <libssh2_sftp.h>
+#include <ssh/ssh_session.hpp>
 
 namespace linuxplorer::ssh::sftp {
 	constexpr std::streamsize sftpbuf_default_buffer_size = 0x1000;
@@ -32,19 +32,33 @@ namespace linuxplorer::ssh::sftp {
 		virtual pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 	public:
 		sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, std::ios_base::openmode used_buffer = std::ios_base::in | std::ios_base::out, std::streamsize buffer_size = sftpbuf_default_buffer_size);	
-		sftpbuf(sftpbuf&& right);
+		sftpbuf(sftpbuf&& right) noexcept;
 	};
+
+	constexpr long sftp_default_permissions_created = LIBSSH2_SFTP_S_IFREG | LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IXUSR;
 
 	class isftpstream : public std::basic_istream<char> {
 	protected:
 		::LIBSSH2_SFTP_HANDLE* m_handle;
 		std::unique_ptr<sftpbuf> m_buffer;
 	public:
-		explicit isftpstream(::LIBSSH2_SFTP* sftp, std::string_view s, std::ios_base::openmode mode = std::ios_base::in, long sftp_posix_permissions_created = LIBSSH2_SFTP_S_IFREG | LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IXUSR);
+		explicit isftpstream(const ssh_session& session, std::wstring_view s, std::ios_base::openmode mode = std::ios_base::in);
 		explicit isftpstream(const isftpstream&) = delete;
 		explicit isftpstream(isftpstream&& right);
 
 		virtual ~isftpstream();
+	};
+
+	class osftpstream : public std::basic_ostream<char> {
+	protected:
+		::LIBSSH2_SFTP_HANDLE* m_handle;
+		std::unique_ptr<sftpbuf> m_buffer;
+	public:
+		explicit osftpstream(const ssh_session& session, std::wstring_view s, std::ios_base::openmode mode = std::ios_base::out, long permissions_created = sftp_default_permissions_created);
+		explicit osftpstream(const osftpstream&) = delete;
+		explicit osftpstream(osftpstream&& right);
+
+		virtual ~osftpstream();
 	};
 }
 

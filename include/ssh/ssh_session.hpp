@@ -4,6 +4,7 @@
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <libssh2.h>
+#include <libssh2_sftp.h>
 
 #include <cstdint>
 #include <string>
@@ -24,6 +25,7 @@ namespace linuxplorer::ssh {
 
 	class ssh_session {
 		::LIBSSH2_SESSION* m_session;
+		::LIBSSH2_SFTP* m_sftp;
 
 		::libssh2_socket_t m_socket;
 		std::variant<::sockaddr_in, ::sockaddr_in6> m_socket_addr;
@@ -33,11 +35,11 @@ namespace linuxplorer::ssh {
 		ssh_session_state m_state;
 
 		const ::sockaddr* get_sockaddr_ptr() const noexcept;
-		std::size_t get_sockaddr_length() const noexcept;
+		std::size_t get_sockaddr_length() const noexcept;		
 	public:
 		ssh_session(const ssh_address& host, std::uint16_t port = default_ssh_port);
 		ssh_session(const ssh_session&) = delete;
-		ssh_session(ssh_session&& right);
+		ssh_session(ssh_session&& right) noexcept;
 
 		void connect(bool ignore_known_hosts = false);
 		void authenticate(std::wstring_view username, std::wstring_view password);
@@ -46,6 +48,8 @@ namespace linuxplorer::ssh {
 		std::uint16_t get_port() const noexcept;
 		const ssh_address& get_host() const noexcept;
 		::LIBSSH2_SESSION* get_session() const noexcept;
+		::LIBSSH2_SFTP* get_sftp() const noexcept;
+		ssh_session_state get_state() const noexcept;
 
 		virtual ~ssh_session();
 	};

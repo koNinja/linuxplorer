@@ -2,9 +2,10 @@
 
 #include <ssh/sftp/sftpstream.hpp>
 #include <ssh/ssh_exception.hpp>
+#include <util/charset/multibyte_wide_compat_helper.hpp>
 
 namespace linuxplorer::ssh::sftp {
-	sftpbuf::sftpbuf(sftpbuf&& right) {
+	sftpbuf::sftpbuf(sftpbuf&& right) noexcept {
 		this->m_sftp = right.m_sftp;
 		this->m_handle = right.m_handle;
 		this->m_in_seek = right.m_in_seek;
@@ -218,7 +219,7 @@ namespace linuxplorer::ssh::sftp {
 		right.m_handle = nullptr;
 	}
 
-	isftpstream::isftpstream(::LIBSSH2_SFTP* sftp, std::string_view s, std::ios_base::openmode mode, long sftp_posix_permissions_created) : std::basic_istream<char>(nullptr)
+	isftpstream::isftpstream(const ssh_session& session, std::wstring_view s, std::ios_base::openmode mode) : std::basic_istream<char>(nullptr)
 	{
 		unsigned long flags = 0;
 
@@ -232,7 +233,11 @@ namespace linuxplorer::ssh::sftp {
 			flags |= LIBSSH2_FXF_WRITE;
 		}
 		
-		this->m_handle = ::libssh2_sftp_open_ex(sftp, s.data(), s.length() + sizeof(char), flags, sftp_posix_permissions_created, LIBSSH2_SFTP_OPENFILE);
+		auto sftp = session.get_sftp();
+
+		auto path = util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(s);
+
+		this->m_handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, LIBSSH2_FXF_READ, LIBSSH2_SFTP_OPENFILE);
 		if (!this->m_handle) {
 			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
 		}
@@ -249,9 +254,50 @@ namespace linuxplorer::ssh::sftp {
 		this->init(this->m_buffer.get());
 	}
 
-	isftpstream::~isftpstream() {
-		if (this->m_handle) {
-			//::libssh2_sftp_close(this->m_handle);
+	isftpstream::~isftpstream() {}
+
+	osftpstream::osftpstream(const ssh_session& session, std::wstring_view s, std::ios_base::openmode mode, long permissions_created) : std::basic_ostream<char>(nullptr)
+	{
+		unsigned long flags = LIBSSH2_FXF_CREAT;
+
+		if (mode & std::ios_base::trunc) {
+			flags |= LIBSSH2_FXF_TRUNC;
 		}
+		if (mode & std::ios_base::in) {
+			flags |= LIBSSH2_FXF_READ;
+		}
+		if (mode & std::ios_base::out) {
+			flags |= LIBSSH2_FXF_WRITE;
+		}
+		
+		auto sftp = session.get_sftp();
+
+		auto path = util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(s);
+
+		this->m_handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, permissions_created, LIBSSH2_SFTP_OPENFILE);
+		if (!this->m_handle) {
+			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
+		}
+
+		this->m_buffer = std::make_unique<sftpbuf>(sftp, this->m_handle, std::ios_base::out, sftpbuf_default_buffer_size);
+		
+		if (mode & std::ios_base::app) {
+			this->m_buffer->pubseekoff(0, std::ios_base::end, std::ios_base::out);
+		}
+		if (mode & std::ios_base::ate) {
+			this->m_buffer->pubseekoff(0, std::ios_base::end);
+		}
+
+		this->init(this->m_buffer.get());
 	}
+
+	osftpstream::osftpstream(osftpstream&& right) : std::basic_ostream<char>(nullptr) {
+		this->m_buffer = std::move(right.m_buffer);
+		this->m_handle = right.m_handle;
+
+		this->init(this->m_buffer.get());
+		right.m_handle = nullptr;
+	}
+
+	osftpstream::~osftpstream() {}
 }
