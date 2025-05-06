@@ -84,7 +84,7 @@ namespace linuxplorer::ssh {
 
 	void ssh_session::connect(bool ignore_known_hosts) {
 		if (this->m_state != ssh_session_state::connectable) {
-			throw std::runtime_error("Session is not in a state to connect.");
+			throw ssh_invalid_state_operation("Session is not in a state to connect.");
 		}
 
 		int result = ::connect(this->m_socket, this->get_sockaddr_ptr(), this->get_sockaddr_length());
@@ -120,7 +120,7 @@ namespace linuxplorer::ssh {
 		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
 
 		if (this->m_state != ssh_session_state::need_to_authenticate) {
-			throw std::runtime_error("Session is not in a state to authenticate.");
+			throw ssh_invalid_state_operation("Session is not in a state to authenticate.");
 		}
 
 		this->m_username = username.data();
@@ -142,7 +142,7 @@ namespace linuxplorer::ssh {
 		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
 
 		if (this->m_state != ssh_session_state::connected) {
-			throw std::runtime_error("Session is not in a state to disconnect.");
+			throw ssh_invalid_state_operation("Session is not in a state to disconnect.");
 		}
 
 		::libssh2_sftp_shutdown(this->m_sftp);
