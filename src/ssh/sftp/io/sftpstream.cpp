@@ -1,10 +1,10 @@
 #define NOMINMAX
 
-#include <ssh/sftp/sftpstream.hpp>
+#include <ssh/sftp/io/sftpstream.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 
-namespace linuxplorer::ssh::sftp {
+namespace linuxplorer::ssh::sftp::io {
 	sftpbuf::sftpbuf(sftpbuf&& right) noexcept {
 		this->m_sftp = right.m_sftp;
 		this->m_handle = right.m_handle;

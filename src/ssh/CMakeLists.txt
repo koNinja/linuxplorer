@@ -5,6 +5,6 @@ target_sources(ssh PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/ssh_session.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ssh_address.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/auth/ssh_knownhosts.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/sftp/sftpstream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/sftp/io/sftpstream.cpp
 )
 target_sources(ssh PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/internal/ssh_library_resource_manager.cpp)

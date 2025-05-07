@@ -3,7 +3,7 @@
 #include <ssh/ssh_session.hpp>
 #include <ssh/auth/ssh_knownhosts.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
-#include <ssh/sftp/sftpstream.hpp>
+#include <ssh/sftp/io/sftpstream.hpp>
 
 #include <windows.h>
 #include <libssh2_sftp.h>
@@ -82,7 +82,7 @@ TEST(sftpstream, isftpstream) {
 	ss.authenticate(user, passwd);
 	
 	char data[0x1000];
-	ssh::sftp::isftpstream iss(ss, L"/home/koninja/libssh2-errno.csv");
+	ssh::sftp::io::isftpstream iss(ss, L"/home/koninja/libssh2-errno.csv");
 
 	std::string str;
 	while (std::getline(iss, str)) {
@@ -102,6 +102,6 @@ TEST(sftpstream, osftpstream) {
 	ss.connect();
 	ss.authenticate(user, passwd);
 
-	ssh::sftp::osftpstream ofs(ss, L"/home/koninja/sample.txt");
+	ssh::sftp::io::osftpstream ofs(ss, L"/home/koninja/sample.txt");
 	ofs << "Hello, world!" << std::endl;
 }
