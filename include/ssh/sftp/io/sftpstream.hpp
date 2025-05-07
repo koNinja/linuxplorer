@@ -6,7 +6,7 @@
 #include <iostream>
 #include <ssh/ssh_session.hpp>
 
-namespace linuxplorer::ssh::sftp {
+namespace linuxplorer::ssh::sftp::io {
 	constexpr std::streamsize sftpbuf_default_buffer_size = 0x1000;
 
 	class sftpbuf : public std::basic_streambuf<char> {
