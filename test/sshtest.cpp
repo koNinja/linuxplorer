@@ -1,17 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <ssh/ssh_session.hpp>
-#include <ssh/auth/ssh_knownhosts.hpp>
+#include <ssh/ssh_exception.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
-#include <ssh/sftp/io/sftpstream.hpp>
 
-#include <windows.h>
-#include <libssh2_sftp.h>
-#include <fstream>
-#include <tuple>
+#include <ssh/sftp/sftp_session.hpp>
+
 #include <fstream>
 #include <filesystem>
-
 #include <nlohmann/json.hpp>
 
 using namespace linuxplorer;
@@ -33,7 +29,7 @@ std::tuple<ssh::ssh_address, std::wstring, std::wstring> get_cert() {
 	);
 }
 
-TEST(sftp, exec) {
+TEST(ssh, exec) {
 	auto [addr, user, passwd] = get_cert();
 
 	ssh::ssh_session ss(addr);
@@ -71,6 +67,40 @@ TEST(sftp, exec) {
 	ss.disconnect();
 }
 
+TEST(sftp, read) {
+	using namespace linuxplorer;
+
+	auto [addr, user, passwd] = get_cert();
+
+	auto ss = new ssh::ssh_session(addr);
+
+	ss->connect();
+	ss->authenticate(user, passwd);
+
+	auto sftp = new ssh::sftp::sftp_session(*ss);
+	::LIBSSH2_SFTP_HANDLE *handle = ::libssh2_sftp_open(sftp->get_session(), "/home/koninja/libssh2-errno.csv", LIBSSH2_FXF_READ, 0);
+	if (handle == nullptr) {
+		throw ssh::ssh_libssh2_exception(::libssh2_sftp_last_error(sftp->get_session()), "Failed to open a file.");
+	}
+
+	constexpr std::size_t buflen = 0x1000;
+
+	char buf[buflen];
+	::ssize_t bytes_read = ::libssh2_sftp_read(handle, buf, sizeof(buf));
+
+	for (int i = 0; i < 1477; i++) {
+		std::cout.put(buf[i]);
+	}
+
+	// flush
+	std::cout.flush();
+
+	auto weakref1 = ss->get_weak();
+	delete ss;
+	delete sftp;
+}
+
+/*
 TEST(sftpstream, isftpstream) {
 	using namespace linuxplorer;
 
@@ -92,6 +122,7 @@ TEST(sftpstream, isftpstream) {
 	ss.disconnect();
 }
 
+
 TEST(sftpstream, osftpstream) {
 	using namespace linuxplorer;
 
@@ -105,3 +136,4 @@ TEST(sftpstream, osftpstream) {
 	ssh::sftp::io::osftpstream ofs(ss, L"/home/koninja/sample.txt");
 	ofs << "Hello, world!" << std::endl;
 }
+*/

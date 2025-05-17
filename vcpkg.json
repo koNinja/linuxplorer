@@ -2,6 +2,7 @@
   "dependencies": [
     "libssh2",
     "gtest",
-    "nlohmann-json"
+    "nlohmann-json",
+    "boost-uuid"
   ]
 }

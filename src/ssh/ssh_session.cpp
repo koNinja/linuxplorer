@@ -1,7 +1,6 @@
 #define USE_SSH_INTERNAL_LIBRARIES
 
 #include <ssh/ssh_session.hpp>
-#include <ssh/auth/ssh_knownhosts.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <ssh/internal/ssh_library_resource_manager.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
@@ -31,13 +30,6 @@ namespace linuxplorer::ssh {
 		}
 	}
 
-	ssh_session::ssh_session(ssh_session&& right) noexcept : 
-		m_host(right.m_host), m_session(right.m_session), m_socket(right.m_socket), m_state(right.m_state), m_socket_addr(std::move(right.m_socket_addr)), m_username(std::move(right.m_username)), m_sftp(right.m_sftp)
-	{
-		right.m_session = nullptr;
-		right.m_sftp = nullptr;
-	}
-
 	ssh_session::ssh_session(const ssh_address& host, std::uint16_t port) : m_host(host) {
 		if (!internal::ssh_library_resource_manager::is_wsa_initiated()) {
 			int errc = internal::ssh_library_resource_manager::try_initiate_wsa();
@@ -51,6 +43,8 @@ namespace linuxplorer::ssh {
 				throw ssh_libssh2_exception(errc, "Failed to initiate use of the libssh2 by the process.");
 			}
 		}
+
+		this->m_id = boost::uuids::random_generator()();
 
 		this->m_socket = ::socket(this->m_host.get_type() == ssh_address_type::ipv4 ? AF_INET : AF_INET6, SOCK_STREAM, 0);
 		if (this->m_socket == LIBSSH2_INVALID_SOCKET) throw ssh_wsa_exception(::WSAGetLastError(), "Failed to create a socket.");
@@ -72,17 +66,17 @@ namespace linuxplorer::ssh {
 				break;
 		}
 
-		this->m_session = ::libssh2_session_init();
+		this->m_session = internal::build_session_from(::libssh2_session_init());
 		if (this->m_session == nullptr) {
 			throw ssh_libssh2_exception(-1, "Failed to initialize an SSH session object.");
 		}
 		
-		::libssh2_session_set_blocking(this->m_session, true);
+		::libssh2_session_set_blocking(this->m_session->ptr(), true);
 
 		this->m_state = ssh_session_state::connectable;
 	}
 
-	void ssh_session::connect(bool ignore_known_hosts) {
+	void ssh_session::connect() {
 		if (this->m_state != ssh_session_state::connectable) {
 			throw ssh_invalid_state_operation("Session is not in a state to connect.");
 		}
@@ -92,25 +86,9 @@ namespace linuxplorer::ssh {
 			throw ssh_wsa_exception(::WSAGetLastError(), "Failed to connect to the SSH server.");
 		}
 
-		result = ::libssh2_session_handshake(this->m_session, this->m_socket);
+		result = ::libssh2_session_handshake(this->m_session->ptr(), this->m_socket);
 		if (result < 0) {
 			throw ssh_libssh2_exception(result, "Failed to perform the SSH handshake.");
-		}
-
-		if (!ignore_known_hosts) {
-			auth::ssh_knownhosts knownhosts(*this);
-			auto result = knownhosts.check();
-
-			switch (result) {
-				case auth::ssh_knownhosts_check_result::matched:
-					break;
-				case auth::ssh_knownhosts_check_result::mismatch:
-					throw auth::ssh_knownhost_exception(auth::ssh_knownhosts_check_result::mismatch, "Host was found, but the keys didn't match.");
-				case auth::ssh_knownhosts_check_result::missing:
-					throw auth::ssh_knownhost_exception(auth::ssh_knownhosts_check_result::missing, "Host was not found in the known hosts.");
-				default:
-					throw std::logic_error("Unknown known hosts check result.");
-			}
 		}
 
 		this->m_state = ssh_session_state::need_to_authenticate;
@@ -125,14 +103,9 @@ namespace linuxplorer::ssh {
 
 		this->m_username = username.data();
 
-		int result = libssh2_userauth_password(this->m_session, charset_helper::convert_wide_to_multibyte(username).c_str(), charset_helper::convert_wide_to_multibyte(password).c_str());
+		int result = libssh2_userauth_password(this->m_session->ptr(), charset_helper::convert_wide_to_multibyte(username).c_str(), charset_helper::convert_wide_to_multibyte(password).c_str());
 		if (result != 0) {
 			throw ssh_libssh2_exception(result, "Failed to authenticate.");
-		}
-
-		this->m_sftp = ::libssh2_sftp_init(this->m_session);
-		if (this->m_sftp == nullptr) {
-			throw ssh_libssh2_exception(::libssh2_session_last_errno(this->m_session), "Failed to initialize an SFTP session object.");
 		}
 
 		this->m_state = ssh_session_state::connected;
@@ -145,8 +118,7 @@ namespace linuxplorer::ssh {
 			throw ssh_invalid_state_operation("Session is not in a state to disconnect.");
 		}
 
-		::libssh2_sftp_shutdown(this->m_sftp);
-		::libssh2_session_disconnect(this->m_session, charset_helper::convert_wide_to_multibyte(description).c_str());
+		::libssh2_session_disconnect(this->m_session->ptr(), charset_helper::convert_wide_to_multibyte(description).c_str());
 
 		this->m_state = ssh_session_state::disconnected;
 	}
@@ -171,15 +143,19 @@ namespace linuxplorer::ssh {
 	}
 
 	::LIBSSH2_SESSION* ssh_session::get_session() const noexcept {
-		return this->m_session;
+		return this->m_session->ptr();
 	}
 
-	::LIBSSH2_SFTP* ssh_session::get_sftp() const noexcept {
-		return this->m_sftp;
+	internal::weak_ssh_session_ptr ssh_session::get_weak() const noexcept {
+		return this->m_session;
 	}
 
 	ssh_session_state ssh_session::get_state() const noexcept {
 		return this->m_state;
+	}
+
+	const boost::uuids::uuid& ssh_session::get_id() const noexcept {
+		return this->m_id;
 	}
 
 	ssh_session::~ssh_session() {
@@ -187,8 +163,6 @@ namespace linuxplorer::ssh {
 			this->disconnect();
 		}
 		
-		::libssh2_session_free(this->m_session);
-
 		::shutdown(this->m_socket, SD_BOTH);
 		::closesocket(this->m_socket);
 	}
