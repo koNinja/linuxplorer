@@ -1,0 +1,34 @@
+#include <ssh/sftp/sftp_session.hpp>
+#include <ssh/ssh_exception.hpp>
+
+namespace linuxplorer::ssh::sftp {
+	sftp_session::sftp_session(const ssh_session& session) {
+		auto ss_id = session.get_id();
+
+		if (s_sessions.contains(ss_id) && !s_sessions[ss_id].expired()) {
+			this->m_session = s_sessions[ss_id].lock();
+		}
+		else {
+			::LIBSSH2_SFTP* sftp = ::libssh2_sftp_init(session.get_session());
+			if (!sftp) {
+				throw ssh_libssh2_exception(::libssh2_session_last_errno(session.get_session()), "Failed to initialize a SFTP session.");
+			}
+
+			this->m_session = internal::build_sftp_from(sftp, session);
+
+			s_sessions[ss_id] = internal::weak_sftp_session_ptr(this->m_session);
+		}
+	}
+
+	::LIBSSH2_SFTP* sftp_session::get_session() const noexcept {
+		return this->m_session->ptr();
+	}
+
+	internal::weak_sftp_session_ptr sftp_session::get_weak() const noexcept {
+		return this->m_session;
+	}
+
+	sftp_handle::sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle) {
+		this->m_handle = internal::unqiue_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
+	}
+}
