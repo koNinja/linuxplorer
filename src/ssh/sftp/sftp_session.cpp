@@ -27,4 +27,8 @@ namespace linuxplorer::ssh::sftp {
 	internal::weak_sftp_session_ptr sftp_session::get_weak() const noexcept {
 		return this->m_session;
 	}
+
+	sftp_handle::sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle) {
+		this->m_handle = internal::unqiue_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
+	}
 }

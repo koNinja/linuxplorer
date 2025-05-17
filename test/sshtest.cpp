@@ -83,6 +83,8 @@ TEST(sftp, read) {
 		throw ssh::ssh_libssh2_exception(::libssh2_sftp_last_error(sftp->get_session()), "Failed to open a file.");
 	}
 
+	auto hfile = new ssh::sftp::sftp_handle(*sftp, handle);
+
 	constexpr std::size_t buflen = 0x1000;
 
 	char buf[buflen];
@@ -96,8 +98,13 @@ TEST(sftp, read) {
 	std::cout.flush();
 
 	auto weakref1 = ss->get_weak();
+	auto weakref2 = sftp->get_weak();
 	delete ss;
 	delete sftp;
+	delete hfile;
+
+	EXPECT_TRUE(weakref1.expired());
+	EXPECT_TRUE(weakref2.expired());
 }
 
 /*

@@ -7,8 +7,6 @@
 
 namespace linuxplorer::ssh::sftp {
 	namespace internal {
-		struct sftp_session_delete;
-
 		struct internal_sftp_session_ptr_t {
 		private:
 			ssh::internal::shared_ssh_session_ptr m_dependency;
@@ -26,8 +24,6 @@ namespace linuxplorer::ssh::sftp {
 			inline ::LIBSSH2_SFTP* ptr() const noexcept {
 				return this->m_ptr;
 			}
-
-			friend sftp_session_delete;
 		};
 
 		using shared_sftp_session_ptr = std::shared_ptr<internal_sftp_session_ptr_t>;
@@ -63,8 +59,17 @@ namespace linuxplorer::ssh::sftp {
 				return this->m_ptr;
 			}
 		};
-	}
+		
+		struct sftp_handle_delete {
+			public:
+			void operator()(internal_sftp_handle_ptr_t* ptr) {
+				::libssh2_sftp_close_handle(ptr->ptr());
+				delete ptr;
+			}
+		};
 
+		using unqiue_sftp_handle_ptr = std::unique_ptr<internal_sftp_handle_ptr_t, sftp_handle_delete>;
+	}
 	
 	class sftp_session {
 	private:
@@ -80,17 +85,17 @@ namespace linuxplorer::ssh::sftp {
 		::LIBSSH2_SFTP* get_session() const noexcept;
 	};
 
-	/*
+	
 	class sftp_handle {
 	private:
-		internal::internal_sftp_handle_ptr_t m_handle;
+		internal::unqiue_sftp_handle_ptr m_handle;
 	public:
-		sftp_handle(const sftp_session& session, const std::filesystem::path& path);
+		sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle);
 		sftp_handle(const sftp_handle&) = delete;
 		sftp_handle(sftp_handle&&) = default;
 
 		::LIBSSH2_SFTP_HANDLE* get_handle() const noexcept;
-	};*/
+	};
 }
 
 #endif // SFTP_SESSION_HPP
