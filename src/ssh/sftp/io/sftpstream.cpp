@@ -1,27 +1,18 @@
-#define NOMINMAX
-
 #include <ssh/sftp/io/sftpstream.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 
 namespace linuxplorer::ssh::sftp::io {
-	sftpbuf::sftpbuf(sftpbuf&& right) noexcept {
-		this->m_sftp = right.m_sftp;
-		this->m_handle = right.m_handle;
-		this->m_in_seek = right.m_in_seek;
-		this->m_out_seek = right.m_out_seek;
-		this->m_inbufsize = right.m_inbufsize;
-		this->m_outbufsize = right.m_outbufsize;
-		this->m_inbuf = std::move(right.m_inbuf);
-		this->m_outbuf = std::move(right.m_outbuf);
-		
-		right.m_sftp = nullptr;
-		right.m_handle = nullptr;
+	sftpbuf::sftpbuf(sftpbuf&& rhs) noexcept : m_sftp(std::move(rhs.m_sftp)), m_handle(std::move(rhs.m_handle)) {
+		this->m_in_seek = rhs.m_in_seek;
+		this->m_out_seek = rhs.m_out_seek;
+		this->m_inbufsize = rhs.m_inbufsize;
+		this->m_outbufsize = rhs.m_outbufsize;
+		this->m_inbuf = std::move(rhs.m_inbuf);
+		this->m_outbuf = std::move(rhs.m_outbuf);
 	}
 
-	sftpbuf::sftpbuf(::LIBSSH2_SFTP* sftp, ::LIBSSH2_SFTP_HANDLE* handle, std::ios_base::openmode used_buffer, std::streamsize buffer_size) {
-		this->m_sftp = sftp;
-		this->m_handle = handle;
+	sftpbuf::sftpbuf(const sftp_session& sftp, sftp_handle&& handle, std::ios_base::openmode used_buffer, std::streamsize buffer_size) : m_sftp(sftp), m_handle(std::move(handle)) {
 		this->m_inbuf = nullptr;
 		this->m_outbuf = nullptr;
 		this->m_inbufsize = 0;
@@ -40,7 +31,7 @@ namespace linuxplorer::ssh::sftp::io {
 			this->m_outbuf = std::make_unique<sftpbuf::char_type[]>(this->m_outbufsize);
 		}
 
-		::libssh2_sftp_seek64(this->m_handle, 0);
+		::libssh2_sftp_seek64(this->m_handle.get_handle(), 0);
 
 		this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get());
 		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
@@ -73,8 +64,8 @@ namespace linuxplorer::ssh::sftp::io {
 			return sftpbuf::traits_type::eof();
 		}
 
-		::libssh2_sftp_seek64(this->m_handle, this->m_in_seek);
-		auto bytes_read = libssh2_sftp_read(this->m_handle, this->m_inbuf.get(), this->m_inbufsize);
+		::libssh2_sftp_seek64(this->m_handle.get_handle(), this->m_in_seek);
+		auto bytes_read = libssh2_sftp_read(this->m_handle.get_handle(), this->m_inbuf.get(), this->m_inbufsize);
 		if (bytes_read < 0) {
 			throw ssh_libssh2_sftp_exception(bytes_read, "Failed to read data.");
 		}
@@ -120,9 +111,9 @@ namespace linuxplorer::ssh::sftp::io {
 		}
 
 		sftpbuf::int_type result = sftpbuf::traits_type::not_eof(ch);
-		::libssh2_sftp_seek64(this->m_handle, this->m_out_seek);
+		::libssh2_sftp_seek64(this->m_handle.get_handle(), this->m_out_seek);
 
-		auto bytes_written = ::libssh2_sftp_write(this->m_handle, this->m_outbuf.get(), this->pptr() - this->pbase());
+		auto bytes_written = ::libssh2_sftp_write(this->m_handle.get_handle(), this->m_outbuf.get(), this->pptr() - this->pbase());
 		if (bytes_written < 0) {
 			throw ssh_libssh2_exception(bytes_written, "Failed to write data.");
 		}
@@ -133,7 +124,7 @@ namespace linuxplorer::ssh::sftp::io {
 		if (!sftpbuf::traits_type::eq_int_type(ch, sftpbuf::traits_type::eof())) {
 			sftpbuf::char_type c = sftpbuf::traits_type::to_char_type(ch);
 
-			auto bytes_append = ::libssh2_sftp_write(this->m_handle, &c, 1);
+			auto bytes_append = ::libssh2_sftp_write(this->m_handle.get_handle(), &c, 1);
 			if (bytes_append < 0) {
 				throw ssh_libssh2_exception(bytes_append, "Failed to append the parameter data.");
 			}
@@ -180,7 +171,7 @@ namespace linuxplorer::ssh::sftp::io {
 		case std::ios_base::end:
 		{
 			::LIBSSH2_SFTP_ATTRIBUTES attr;
-			int rc = libssh2_sftp_fstat(this->m_handle, &attr);
+			int rc = libssh2_sftp_fstat(this->m_handle.get_handle(), &attr);
 			if (rc < 0) {
 				throw ssh_libssh2_sftp_exception(rc, "Failed to get attributes on an SFTP file handle.");
 			}
@@ -213,13 +204,10 @@ namespace linuxplorer::ssh::sftp::io {
 
 	isftpstream::isftpstream(isftpstream&& right) : std::basic_istream<char>(nullptr) {
 		this->m_buffer = std::move(right.m_buffer);
-		this->m_handle = right.m_handle;
-
 		this->init(this->m_buffer.get());
-		right.m_handle = nullptr;
 	}
 
-	isftpstream::isftpstream(const ssh_session& session, std::wstring_view s, std::ios_base::openmode mode) : std::basic_istream<char>(nullptr)
+	isftpstream::isftpstream(const sftp_session& session, std::wstring_view s, std::ios_base::openmode mode) : std::basic_istream<char>(nullptr)
 	{
 		unsigned long flags = 0;
 
@@ -233,16 +221,16 @@ namespace linuxplorer::ssh::sftp::io {
 			flags |= LIBSSH2_FXF_WRITE;
 		}
 		
-		auto sftp = session.get_sftp();
+		auto sftp = session.get_session();
 
 		auto path = util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(s);
 
-		this->m_handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, LIBSSH2_FXF_READ, LIBSSH2_SFTP_OPENFILE);
-		if (!this->m_handle) {
+		auto handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, LIBSSH2_FXF_READ, LIBSSH2_SFTP_OPENFILE);
+		if (!handle) {
 			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
 		}
 
-		this->m_buffer = std::make_unique<sftpbuf>(sftp, this->m_handle, std::ios_base::in, sftpbuf_default_buffer_size);
+		this->m_buffer = std::make_unique<sftpbuf>(session, std::move(sftp_handle(session, handle)), std::ios_base::in, sftpbuf_default_buffer_size);
 		
 		if (mode & std::ios_base::app) {
 			this->m_buffer->pubseekoff(0, std::ios_base::end, std::ios_base::out);
@@ -254,9 +242,7 @@ namespace linuxplorer::ssh::sftp::io {
 		this->init(this->m_buffer.get());
 	}
 
-	isftpstream::~isftpstream() {}
-
-	osftpstream::osftpstream(const ssh_session& session, std::wstring_view s, std::ios_base::openmode mode, long permissions_created) : std::basic_ostream<char>(nullptr)
+	osftpstream::osftpstream(const sftp_session& session, std::wstring_view s, std::ios_base::openmode mode, long permissions_created) : std::basic_ostream<char>(nullptr)
 	{
 		unsigned long flags = LIBSSH2_FXF_CREAT;
 
@@ -270,16 +256,16 @@ namespace linuxplorer::ssh::sftp::io {
 			flags |= LIBSSH2_FXF_WRITE;
 		}
 		
-		auto sftp = session.get_sftp();
+		auto sftp = session.get_session();
 
 		auto path = util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(s);
 
-		this->m_handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, permissions_created, LIBSSH2_SFTP_OPENFILE);
-		if (!this->m_handle) {
+		auto handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, permissions_created, LIBSSH2_SFTP_OPENFILE);
+		if (!handle) {
 			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
 		}
 
-		this->m_buffer = std::make_unique<sftpbuf>(sftp, this->m_handle, std::ios_base::out, sftpbuf_default_buffer_size);
+		this->m_buffer = std::make_unique<sftpbuf>(session,  std::move(sftp_handle(session, handle)), std::ios_base::out, sftpbuf_default_buffer_size);
 		
 		if (mode & std::ios_base::app) {
 			this->m_buffer->pubseekoff(0, std::ios_base::end, std::ios_base::out);
@@ -293,11 +279,6 @@ namespace linuxplorer::ssh::sftp::io {
 
 	osftpstream::osftpstream(osftpstream&& right) : std::basic_ostream<char>(nullptr) {
 		this->m_buffer = std::move(right.m_buffer);
-		this->m_handle = right.m_handle;
-
 		this->init(this->m_buffer.get());
-		right.m_handle = nullptr;
 	}
-
-	osftpstream::~osftpstream() {}
 }

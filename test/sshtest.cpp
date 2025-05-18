@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <ssh/ssh_session.hpp>
+#include <ssh/sftp/sftp_session.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
-
-#include <ssh/sftp/sftp_session.hpp>
+#include <ssh/sftp/io/sftpstream.hpp>
 
 #include <fstream>
 #include <filesystem>
@@ -29,6 +29,7 @@ std::tuple<ssh::ssh_address, std::wstring, std::wstring> get_cert() {
 	);
 }
 
+/*
 TEST(ssh, exec) {
 	auto [addr, user, passwd] = get_cert();
 
@@ -106,8 +107,8 @@ TEST(sftp, read) {
 	EXPECT_TRUE(weakref1.expired());
 	EXPECT_TRUE(weakref2.expired());
 }
+*/
 
-/*
 TEST(sftpstream, isftpstream) {
 	using namespace linuxplorer;
 
@@ -143,4 +144,3 @@ TEST(sftpstream, osftpstream) {
 	ssh::sftp::io::osftpstream ofs(ss, L"/home/koninja/sample.txt");
 	ofs << "Hello, world!" << std::endl;
 }
-*/

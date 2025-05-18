@@ -20,6 +20,10 @@ namespace linuxplorer::ssh::sftp {
 		}
 	}
 
+	sftp_session::operator bool() const noexcept {
+		return this->m_session != nullptr;
+	}
+
 	::LIBSSH2_SFTP* sftp_session::get_session() const noexcept {
 		return this->m_session->ptr();
 	}
@@ -30,5 +34,13 @@ namespace linuxplorer::ssh::sftp {
 
 	sftp_handle::sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle) {
 		this->m_handle = internal::unqiue_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
+	}
+
+	sftp_handle::operator bool() const noexcept {
+		return this->m_handle != nullptr;
+	}
+
+	::LIBSSH2_SFTP_HANDLE* sftp_handle::get_handle() const noexcept {
+		return this->m_handle->ptr();
 	}
 }
