@@ -76,6 +76,7 @@ namespace linuxplorer::ssh {
 		ssh_session(const ssh_address& host, std::uint16_t port = default_ssh_port);
 		ssh_session(const ssh_session&) = delete;
 		ssh_session(ssh_session&& rhs) = default;
+		operator bool() const noexcept;
 
 		void connect();
 		void authenticate(std::wstring_view username, std::wstring_view password);

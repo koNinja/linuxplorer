@@ -80,6 +80,7 @@ namespace linuxplorer::ssh::sftp {
 		sftp_session(const ssh_session& session);
 		sftp_session(const sftp_session&) = default;
 		sftp_session(sftp_session&&) = default;
+		operator bool() const noexcept;
 
 		internal::weak_sftp_session_ptr get_weak() const noexcept;
 		::LIBSSH2_SFTP* get_session() const noexcept;
@@ -93,6 +94,7 @@ namespace linuxplorer::ssh::sftp {
 		sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle);
 		sftp_handle(const sftp_handle&) = delete;
 		sftp_handle(sftp_handle&&) = default;
+		operator bool() const noexcept;
 
 		::LIBSSH2_SFTP_HANDLE* get_handle() const noexcept;
 	};
