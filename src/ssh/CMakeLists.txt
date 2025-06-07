@@ -4,6 +4,7 @@ target_link_libraries(ssh PUBLIC libssh2::libssh2 linuxplorer::util::charset Boo
 target_sources(ssh PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/ssh_session.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ssh_address.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/auth/ssh_knownhosts.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sftp/sftp_session.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sftp/io/sftpstream.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sftp/filesystem/sftp_entity.cpp
