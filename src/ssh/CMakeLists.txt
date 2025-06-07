@@ -6,6 +6,8 @@ target_sources(ssh PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/ssh_address.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sftp/sftp_session.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sftp/io/sftpstream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/sftp/filesystem/sftp_entity.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/sftp/filesystem/sftp_manip.cpp
 )
 target_sources(ssh PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/internal/ssh_library_resource_manager.cpp)
 target_compile_definitions(ssh PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
