@@ -32,7 +32,14 @@ namespace linuxplorer::ssh::sftp {
 		return this->m_session;
 	}
 
+	int sftp_session::get_last_errno() const noexcept {
+		return ::libssh2_sftp_last_error(this->m_session->ptr());
+	}
+
 	sftp_handle::sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle) {
+		if (!handle) {
+			throw std::invalid_argument("null handle.");
+		}
 		this->m_handle = internal::unqiue_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
 	}
 
