@@ -158,6 +158,10 @@ namespace linuxplorer::ssh {
 		return this->m_id;
 	}
 
+	int ssh_session::get_last_errno() const noexcept {
+		return ::libssh2_session_last_errno(this->m_session->ptr());
+	}
+
 	ssh_session::~ssh_session() {
 		if (this->m_state == ssh_session_state::connected) {
 			this->disconnect();

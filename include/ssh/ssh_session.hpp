@@ -88,6 +88,7 @@ namespace linuxplorer::ssh {
 		internal::weak_ssh_session_ptr get_weak() const noexcept;
 		ssh_session_state get_state() const noexcept;
 		const boost::uuids::uuid& get_id() const noexcept;
+		int get_last_errno() const noexcept;
 
 		virtual ~ssh_session();
 	};

@@ -84,6 +84,7 @@ namespace linuxplorer::ssh::sftp {
 
 		internal::weak_sftp_session_ptr get_weak() const noexcept;
 		::LIBSSH2_SFTP* get_session() const noexcept;
+		int get_last_errno() const noexcept;
 	};
 
 	
