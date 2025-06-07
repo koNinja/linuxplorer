@@ -5,6 +5,7 @@
 #include <ssh/sftp/sftp_session.hpp>
 #include <ssh/sftp/filesystem/sftp_manip.hpp>
 #include <ssh/sftp/filesystem/sftp_entity.hpp>
+#include <ssh/auth/ssh_knownhosts.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 
 #include <fstream>
@@ -37,4 +38,17 @@ TEST(sftp_manip, stat) {
 	ssh::ssh_session ss(addr);
 	ss.connect();
 	ss.authenticate(user, pass);
+}
+
+TEST(knownhosts, write) {
+	const auto& [addr, user, pass] = get_cert();
+	using namespace linuxplorer;
+
+	ssh::ssh_session ss(addr);
+	ss.connect();
+	ss.authenticate(user, pass);
+
+	ssh::auth::ssh_knownhosts hosts(ss);
+
+	hosts.enumerate();
 }

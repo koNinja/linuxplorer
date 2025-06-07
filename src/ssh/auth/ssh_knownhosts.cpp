@@ -2,9 +2,8 @@
 
 #include <ssh/auth/ssh_knownhosts.hpp>
 #include <ssh/ssh_exception.hpp>
-#include <fstream>
-
 #include <util/charset/multibyte_wide_compat_helper.hpp>
+#include <fstream>
 
 namespace linuxplorer::ssh::auth {
 	ssh_knownhosts::ssh_knownhosts(const ssh_session& session, std::wstring_view path) : m_session(session) {
@@ -30,7 +29,7 @@ namespace linuxplorer::ssh::auth {
 			this->m_knownhosts_path = path;
 		}
 
-		this->m_knownhosts = ssh_knownhosts_ptr_t(::libssh2_knownhost_init(this->m_session.get_session()));
+		this->m_knownhosts = internal::unique_ssh_knownhosts_ptr(::libssh2_knownhost_init(this->m_session.get_session()));
 		if (this->m_knownhosts == nullptr) {
 			throw ssh_libssh2_exception(::libssh2_session_last_errno(this->m_session.get_session()), "Failed to initialize known hosts.");
 		}
@@ -41,7 +40,7 @@ namespace linuxplorer::ssh::auth {
 		}
 	}
 
-	void ssh_knownhosts::add(std::wstring_view comment) {
+	void ssh_knownhosts::register_this(std::wstring_view comment) {
 		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
 
 		std::size_t length;
@@ -55,32 +54,16 @@ namespace linuxplorer::ssh::auth {
 			fingerprint,
 			length,
 			charset_helper::convert_wide_to_multibyte(comment).c_str(),
-			comment.size(),
-			LIBSSH2_KNOWNHOST_TYPE_PLAIN | LIBSSH2_KNOWNHOST_KEYENC_RAW | LIBSSH2_KNOWNHOST_KEY_SSHDSS,
+			comment.size() * sizeof(char),
+			LIBSSH2_KNOWNHOST_TYPE_PLAIN | LIBSSH2_KNOWNHOST_KEYENC_RAW | LIBSSH2_KNOWNHOST_KEY_SSHRSA,
 			nullptr
 		);
 		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to add known host.");
+			throw ssh_libssh2_exception(result, "Failed to add a known host.");
 		}
-
-		::libssh2_knownhost* target;
-
-		int rc;
-		::libssh2_knownhost* store, prev;
-		while ((rc = ::libssh2_knownhost_get(this->m_knownhosts.get(), &store, &prev)) == 0) {
-			if (this->m_session.get_host().get_string_address().compare(charset_helper::convert_multibyte_to_wide(store->name)) == 0) {
-				target = store;
-				break;
-			}
-		}
-		if (rc < 0) {
-			throw ssh_libssh2_exception(rc, "Failed to enumerate known hosts.");
-		}
-
-		this->write(target);
 	}
 
-	void ssh_knownhosts::remove() {
+	void ssh_knownhosts::unregister() {
 		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
 
 		::libssh2_knownhost* store, prev;
@@ -99,14 +82,30 @@ namespace linuxplorer::ssh::auth {
 			throw ssh_libssh2_exception(rc, "Failed to enumerate known hosts.");
 		}
 		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to remove known host.");
+			throw ssh_libssh2_exception(result, "Failed to remove a known host.");
 		}
-
-
-		this->write(target);
 	}
 
-	ssh_knownhosts_check_result ssh_knownhosts::check() const {
+	std::vector<ssh_address> ssh_knownhosts::enumerate() const {
+		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
+
+		::libssh2_knownhost* store = nullptr;
+		::libssh2_knownhost* prev = nullptr;
+		int rc;
+		std::vector<ssh_address> result;
+
+		while ((rc = ::libssh2_knownhost_get(this->m_knownhosts.get(), &store, prev)) == 0) {
+			prev = store;
+			result.push_back(ssh_address(charset_helper::convert_multibyte_to_wide(store->name)));
+		}
+		if (rc < 0) {
+			throw ssh_libssh2_exception(rc, "Failed to enumerate known hosts.");
+		}
+
+		return std::move(result);
+	}
+
+	ssh_knownhosts_verify_result ssh_knownhosts::verify() const {
 		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
 
 		::libssh2_knownhost* entry;
@@ -129,31 +128,22 @@ namespace linuxplorer::ssh::auth {
 			case LIBSSH2_KNOWNHOST_CHECK_FAILURE:
 				throw ssh_libssh2_exception(result, "Failed to check known host.");
 			case LIBSSH2_KNOWNHOST_CHECK_MATCH:
-				return ssh_knownhosts_check_result::matched;
+				return ssh_knownhosts_verify_result::matched;
 			case LIBSSH2_KNOWNHOST_CHECK_MISMATCH:
-				return ssh_knownhosts_check_result::mismatch;
+				return ssh_knownhosts_verify_result::mismatch;
 			case LIBSSH2_KNOWNHOST_CHECK_NOTFOUND:
-				return ssh_knownhosts_check_result::missing;
+				return ssh_knownhosts_verify_result::missing;
 			default:
-				throw std::logic_error("Unknown known hosts check result.");
+				throw ssh_libssh2_exception(0, "Unknown known hosts check result.");
 		}
 	}
 
-	void ssh_knownhosts::write(::libssh2_knownhost* target) const {
-		std::size_t length;
-		::libssh2_knownhost_writeline(this->m_knownhosts.get(), target, nullptr, 0, &length, LIBSSH2_KNOWNHOST_FILE_OPENSSH);
-		if (length == 0) {
-			throw ssh_libssh2_exception(::libssh2_session_last_errno(this->m_session.get_session()), "Failed to calculate buffer size for writing known hosts.");
-		}
-		length++;
+	void ssh_knownhosts::flush() const {
+		using charset_helper = util::charset::multibyte_wide_compat_helper;
 
-		auto buffer = std::make_unique<char[]>(length);
-		int result = ::libssh2_knownhost_writeline(this->m_knownhosts.get(), target, buffer.get(), length, &length, LIBSSH2_KNOWNHOST_FILE_OPENSSH);
-		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to convert a known host to a line for storage.");
+		int rc = ::libssh2_knownhost_writefile(this->m_knownhosts.get(), charset_helper::convert_wide_to_multibyte(this->m_knownhosts_path).c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
+		if (rc < 0) {
+			throw ssh_libssh2_exception(rc, "Failed to write data to a known hosts file.");
 		}
-
-		std::ofstream ofs(this->m_knownhosts_path);
-		ofs << buffer.get() << std::endl;
 	}
 }
