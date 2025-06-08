@@ -12,6 +12,7 @@ project(linuxplorer CXX)
 
 find_package(GTest CONFIG REQUIRED)
 find_package(libssh2 CONFIG REQUIRED)
+find_package(boost_uuid REQUIRED CONFIG)
 
 enable_testing()
 include(GoogleTest)
