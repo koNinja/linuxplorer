@@ -1,5 +1,5 @@
-#ifndef CLOUD_PROVIDER_EXCEPTION_H
-#define CLOUD_PROVIDER_EXCEPTION_H
+#ifndef LINUXPLORER_CLOUD_PROVIDER_EXCEPTION_HPP_
+#define LINUXPLORER_CLOUD_PROVIDER_EXCEPTION_HPP_
 
 #include <stdexcept>
 #include <winerror.h>
@@ -14,4 +14,4 @@ namespace linuxplorer::shell {
 	};
 }
 
-#endif // CLOUD_PROVIDER_EXCEPTION_H
+#endif // LINUXPLORER_CLOUD_PROVIDER_EXCEPTION_HPP_

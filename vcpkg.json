@@ -1,6 +1,3 @@
 {
-  "dependencies": [
-    "libssh2",
-    "gtest"
-  ]
+  "dependencies": []
 }

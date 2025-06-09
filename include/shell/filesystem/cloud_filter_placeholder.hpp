@@ -1,6 +1,7 @@
-#ifndef CLOUD_FILTER_PLACEHOLDER_H
-#define CLOUD_FILTER_PLACEHOLDER_H
+#ifndef LINUXPLORER_CLOUD_FILTER_PLACEHOLDER_HPP_
+#define LINUXPLORER_CLOUD_FILTER_PLACEHOLDER_HPP_
 
+#include <shell/shellfwd.hpp>
 #include <shell/cloud_provider_session.hpp>
 #include <string>
 
@@ -10,7 +11,7 @@ namespace linuxplorer::shell::filesystem {
 		directory
 	};
 
-	class cloud_filter_placeholder {
+	class LINUXPLORER_SHELL_API cloud_filter_placeholder {
 		std::wstring m_relative_path;
 		::HANDLE m_handle;
 		placeholder_type m_type;
@@ -35,4 +36,4 @@ namespace linuxplorer::shell::filesystem {
 	};
 }
 
-#endif // CLOUD_FILTER_PLACEHOLDER_H
+#endif // LINUXPLORER_CLOUD_FILTER_PLACEHOLDER_HPP_

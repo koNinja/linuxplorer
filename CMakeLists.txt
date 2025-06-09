@@ -8,14 +8,22 @@ set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(linuxplorer CXX)
+project(linuxplorer VERSION 1.0.0 LANGUAGES CXX)
 
-find_package(GTest CONFIG REQUIRED)
-find_package(libssh2 CONFIG REQUIRED)
+include(GNUInstallDirs)
+
+set(ESCAPED_INSTALL_PREFIX)
+string(REPLACE "/" "\\\\" ESCAPED_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+
+set(LINUXPLORER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(LINUXPLORER_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
+
+set(LINUXPLORER_APP_MAIN_NAME ${PROJECT_NAME})
+set(LINUXPLORER_APP_SERVICE_NAME lxpsvc)
 
 enable_testing()
 include(GoogleTest)
-include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${LINUXPLORER_INCLUDE_DIR})
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/src)
-add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+add_subdirectory(${LINUXPLORER_SOURCE_DIR})
+# add_subdirectory(${PROJECT_SOURCE_DIR}/test)

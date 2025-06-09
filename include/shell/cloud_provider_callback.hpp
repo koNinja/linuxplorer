@@ -1,8 +1,7 @@
-#ifndef CLOUD_PROVIDER_CALLBACK_H
-#define CLOUD_PROVIDER_CALLBACK_H
+#ifndef LINUXPLORER_CLOUD_PROVIDER_CALLBACK_HPP_
+#define LINUXPLORER_CLOUD_PROVIDER_CALLBACK_HPP_
 
-#define NOMINMAX
-
+#include <shell/shellfwd.hpp>
 #include <windows.h>
 #include <cfapi.h>
 
@@ -25,7 +24,7 @@ namespace linuxplorer::shell {
 
 	using cloud_provider_callback_t = void(*)(const ::CF_CALLBACK_INFO*, const ::CF_CALLBACK_PARAMETERS*);
 
-	class cloud_provider_callback {
+	class LINUXPLORER_SHELL_API cloud_provider_callback {
 		cloud_provider_callback_type m_type;
 		cloud_provider_callback_t m_callback;
 	public:

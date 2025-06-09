@@ -1,6 +1,7 @@
-#ifndef CLOUD_PROVIDER_SESSION_H
-#define CLOUD_PROVIDER_SESSION_H
+#ifndef LINUXPLORER_CLOUD_PROVIDER_SESSION_HPP_
+#define LINUXPLORER_CLOUD_PROVIDER_SESSION_HPP_
 
+#include <shell/shellfwd.hpp>
 #include <shell/cloud_provider_callback.hpp>
 
 #include <string>
@@ -8,7 +9,7 @@
 #include <vector>
 
 namespace linuxplorer::shell {
-	class cloud_provider_session {
+	class LINUXPLORER_SHELL_API cloud_provider_session {
 		std::wstring m_sync_root_dir;
 		std::vector<cloud_provider_callback> m_callbacks;
 
@@ -33,4 +34,4 @@ namespace linuxplorer::shell {
 	};
 }
 
-#endif // CLOUD_PROVIDER_SESSION_H
+#endif // LINUXPLORER_CLOUD_PROVIDER_SESSION_HPP_

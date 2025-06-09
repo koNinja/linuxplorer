@@ -1,11 +1,12 @@
-#ifndef CLOUD_PROVIDER_REGISTRAR_H
-#define CLOUD_PROVIDER_REGISTRAR_H
+#ifndef LINUXPLORER_CLOUD_PROVIDER_REGISTRAR_HPP_
+#define LINUXPLORER_CLOUD_PROVIDER_REGISTRAR_HPP_
 
+#include <shell/shellfwd.hpp>
 #include <shell/cloud_provider_session.hpp>
 #include <string_view>
 
 namespace linuxplorer::shell::filesystem {
-	class cloud_provider_registrar {
+	class LINUXPLORER_SHELL_API cloud_provider_registrar {
 	public:
 		cloud_provider_registrar() = delete;
 		cloud_provider_registrar(const cloud_provider_registrar&) = delete;
@@ -22,4 +23,4 @@ namespace linuxplorer::shell::filesystem {
 	};
 }
 
-#endif // CLOUD_PROVIDER_REGISTRAR_H
+#endif // LINUXPLORER_CLOUD_PROVIDER_REGISTRAR_HPP_

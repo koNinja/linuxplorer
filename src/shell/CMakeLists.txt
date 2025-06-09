@@ -1,8 +1,25 @@
-add_library(shell STATIC)
-target_sources(shell PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/cloud_provider_session.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/cloud_provider_callback.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/filesystem/cloud_provider_registrar.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/filesystem/cloud_filter_placeholder.cpp
+add_library(shell SHARED)
+add_library(linuxplorer::shell ALIAS shell)
+set(LINUXPLORER_SHELL_DIR shell)
+target_compile_definitions(shell PRIVATE NOMINMAX LINUXPLORER_SHELL_API_IMPLEMENTATION)
+target_sources(shell 
+	PRIVATE
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_session.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_callback.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_provider_registrar.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_filter_placeholder.cpp
+	PUBLIC
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/shellfwd.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_callback.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_session.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_exception.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_filter_placeholder.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_provider_registrar.hpp
 )
 target_link_libraries(shell PRIVATE cldapi)
+install(TARGETS shell
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_SHELL_DIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_SHELL_DIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LINUXPLORER_SHELL_DIR}
+)
