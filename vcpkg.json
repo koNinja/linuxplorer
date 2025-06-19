@@ -1,6 +1,8 @@
 {
   "dependencies": [
+    "openssl",
     "libssh2",
-    "gtest"
+    "gtest",
+    "nlohmann-json"
   ]
 }

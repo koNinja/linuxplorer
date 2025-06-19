@@ -10,8 +10,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(linuxplorer CXX)
 
+find_package(OpenSSL REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(libssh2 CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 enable_testing()
 include(GoogleTest)
