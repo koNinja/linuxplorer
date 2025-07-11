@@ -33,6 +33,8 @@ namespace linuxplorer::util::config {
 		inline std::wstring_view get_password() const noexcept {
 			return this->m_password;
 		}
+
+		~credential_info() noexcept;
 	};
 
 	inline std::byte* to_byte_ptr(unsigned char* ptr) {

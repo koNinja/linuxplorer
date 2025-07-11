@@ -37,6 +37,12 @@
 */
 
 namespace linuxplorer::util::config {
+	credential_info::~credential_info() noexcept {
+		::RtlSecureZeroMemory(this->m_host.data(), this->m_host.size() * sizeof(decltype(this->m_host)::value_type));
+		::RtlSecureZeroMemory(this->m_username.data(), this->m_username.size() * sizeof(decltype(this->m_username)::value_type));
+		::RtlSecureZeroMemory(this->m_password.data(), this->m_password.size() * sizeof(decltype(this->m_password)::value_type));
+	}
+
 	void credential_config::hlocal_delete_t::operator()(void* ptr) {
 		::LocalFree(ptr);
 	}
