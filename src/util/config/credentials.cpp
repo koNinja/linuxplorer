@@ -1,7 +1,6 @@
 #include <util/config/credentials.hpp>
 
 #include <util/charset/multibyte_wide_compat_helper.hpp>
-#include <fstream>
 #include <nlohmann/json.hpp>
 #include <nlohmann/byte_container_with_subtype.hpp>
 #include <openssl/rand.h>
@@ -17,7 +16,7 @@
 	The format of the byte sequence of the credentials is described below.
 
 	After base64 decoding, the byte sequence has the following structure (array of unsigned char):
-	[2 byte: encrypted key length]
+	[4 byte: encrypted key length]
 	[1 byte: IV length]
 	[N bytes: DPAPI-encrypted AES key]
 	[M bytes: AES IV]
@@ -42,9 +41,7 @@ namespace linuxplorer::util::config {
 		::LocalFree(ptr);
 	}
 
-	credential_config::credential_config() : m_data(L"", L"", L"") {
-		this->m_path = get_config_path();
-	}
+	credential_config::credential_config() : m_data(L"", L"", L"") {}
 
 	void credential_config::decode_from_base64(std::string_view base64_data, std::unique_ptr<std::byte[]>& decoded, std::size_t& decoded_length) {
 		std::size_t base64_data_length = base64_data.size() * sizeof(char);
@@ -214,17 +211,14 @@ namespace linuxplorer::util::config {
 		return credential_info(host, user, passwd);
 	}
 
-	void credential_config::xload() {
-		std::ifstream ifs(this->m_path);
-		auto json = nlohmann::json::parse(ifs);
-
-		auto raw_cred = json["cred"].get<std::string>();
+	void credential_config::xload(const credential_config::json_data_type& data) {
+		auto raw_cred = data;
 		std::size_t raw_cred_length = raw_cred.size();
 		std::unique_ptr<std::byte[]> decoded_raw_cred;
 		std::size_t decoded_raw_cred_length;
 
 		if (raw_cred_length <= 0) {
-			throw config_exception("Invalid configuration data.");
+			throw config_io_exception("Invalid configuration data.");
 		}
 
 		credential_config::decode_from_base64(raw_cred, decoded_raw_cred, decoded_raw_cred_length);
@@ -432,7 +426,7 @@ namespace linuxplorer::util::config {
 		::BIO_free_all(bio);
 	}
 
-	void credential_config::xsave() const {
+	credential_config::json_data_type credential_config::xsave() const {
 		std::unique_ptr<std::byte[]> serialized_cred_info;
 		std::size_t serialized_cred_info_length;
 
@@ -473,15 +467,7 @@ namespace linuxplorer::util::config {
 		std::string cred_data_to_write;
 		credential_config::encode_to_base64(normalized_cred_data.get(), normalized_cred_data_length, cred_data_to_write);
 
-		std::ifstream ifs(this->m_path);
-		auto json = nlohmann::json::parse(ifs);
-
-		json["cred"] = cred_data_to_write;
-
-		auto text = json.dump();
-
-		std::ofstream ofs(this->m_path);
-		ofs << text << std::endl;
+		return cred_data_to_write;
 	}
 
 	credential_config::data_type credential_config::xget() const {

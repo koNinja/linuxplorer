@@ -48,9 +48,10 @@ namespace linuxplorer::util::config {
 		return reinterpret_cast<const unsigned char*>(ptr);
 	}
 
-	class credential_config : public app_mtconfig<credential_info> {
+	class credential_config : public app_mtconfig<credential_info, std::string> {
 	public:
 		using data_type = credential_info;
+		using json_data_type = std::string;
 		credential_config();
 	private:
 		struct hlocal_delete_t {
@@ -120,12 +121,15 @@ namespace linuxplorer::util::config {
 		static void encode_to_base64(const std::byte* plain, std::size_t plain_length, std::string& encoded);
 
 		data_type m_data;
-		std::wstring m_path;
 	protected:
-		virtual void xload() override;
-		virtual void xsave() const override;
+		virtual void xload(const json_data_type& data) override;
+		virtual json_data_type xsave() const override;
 		virtual data_type xget() const override;
 		virtual void xset(const data_type& data) override;
+
+		virtual inline constexpr std::string_view get_json_key_name() const noexcept override {
+			return "cred";
+		}
 	};
 }
 
