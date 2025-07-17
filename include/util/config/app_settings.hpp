@@ -7,6 +7,7 @@
 
 namespace linuxplorer::util::config {
 	std::string get_config_path();
+	std::string get_install_path();
 	
 	class config_exception : public std::runtime_error {
 	public:
@@ -96,7 +97,7 @@ namespace linuxplorer::util::config {
 				std::string_view name = this->get_json_key_name();
 				json[name] = value;
 
-				auto text = json.dump();
+				auto text = json.dump(4);
 
 				std::ofstream ofs(get_config_path());
 				ofs << text << std::endl;
