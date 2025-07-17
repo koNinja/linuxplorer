@@ -1,11 +1,12 @@
 #include <util/config/app_settings.hpp>
 #include <system_error>
 #include <windows.h>
+#include <Shlwapi.h>
 
 #define TO_STRING(x)	#x
 
 namespace linuxplorer::util::config {
-	std::string get_config_path() {
+	std::string configuration_manager::get_config_path() {
 		constexpr std::size_t path_len = MAX_PATH;
 		char path[path_len];
 		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
@@ -20,7 +21,22 @@ namespace linuxplorer::util::config {
 		return result;
 	}
 
-	std::string get_install_path() {
+	std::string configuration_manager::get_install_path() {
 		return TO_STRING(PROJECT_INSTALL_DIR);
+	}
+
+	void configuration_manager::initialize() {
+		try {
+				std::ofstream ofs;
+				ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+				ofs.open(get_config_path());
+				
+				ofs << "{}" << std::endl;
+			}
+			catch (const std::ios_base::failure& e) {
+				std::stringstream error;
+				error << "File stream failed: " << e.code().message();
+				throw config_io_exception(error.str());
+			}
 	}
 }

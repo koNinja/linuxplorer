@@ -76,7 +76,7 @@ namespace linuxplorer::util::config {
 					throw std::system_error(ec, "Failed to initialize COM component on this thread.");
 				}
 
-				auto install_dir = charset::multibyte_wide_compat_helper::convert_multibyte_to_wide(get_install_path());
+				auto install_dir = charset::multibyte_wide_compat_helper::convert_multibyte_to_wide(configuration_manager::get_install_path());
 				std::filesystem::recursive_directory_iterator itr(install_dir);
 				std::filesystem::path src_path;
 				for (const auto& p : itr) {
