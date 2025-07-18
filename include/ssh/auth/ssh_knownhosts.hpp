@@ -1,6 +1,7 @@
-#ifndef SSH_KNOWNHOSTS_HPP
-#define SSH_KNOWNHOSTS_HPP
+#ifndef LINUXPLORER_SSH_KNOWNHOSTS_HPP_
+#define LINUXPLORER_SSH_KNOWNHOSTS_HPP_
 
+#include <ssh/sshfwd.hpp>
 #include <ssh/ssh_session.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <string_view>
@@ -25,7 +26,7 @@ namespace linuxplorer::ssh::auth {
 
 	constexpr const wchar_t* default_knownhosts_path = L"<default_path>";
 	
-	class ssh_knownhosts {
+	class LINUXPLORER_SSH_API ssh_knownhosts {
 		const ssh_session& m_session;
 
 		internal::unique_ssh_knownhosts_ptr m_knownhosts;
@@ -48,4 +49,4 @@ namespace linuxplorer::ssh::auth {
 	};
 }
 
-#endif // SSH_KNOWNHOSTS_HPP
+#endif // LINUXPLORER_SSH_KNOWNHOSTS_HPP_

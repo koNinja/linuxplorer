@@ -1,5 +1,5 @@
-#ifndef SSH_EXCEPTION_HPP
-#define SSH_EXCEPTION_HPP
+#ifndef LINUXPLORER_SSH_EXCEPTION_HPP_
+#define LINUXPLORER_SSH_EXCEPTION_HPP_
 
 #include <stdexcept>
 #include <cstdint>
@@ -48,4 +48,4 @@ namespace linuxplorer::ssh {
 	};
 }
 
-#endif // SSH_EXCEPTION_HPP
+#endif // LINUXPLORER_SSH_EXCEPTION_HPP_

@@ -1,5 +1,5 @@
-#ifndef SFTP_MANIP_HPP
-#define SFTP_MANIP_HPP
+#ifndef LINUXPLORER_SFTP_MANIP_HPP_
+#define LINUXPLORER_SFTP_MANIP_HPP_
 
 #include <ssh/sftp/sftp_session.hpp>
 #include <filesystem>
@@ -41,15 +41,15 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		exclusive
 	};
 
-	sftp_handle create(const sftp_session& session, const std::filesystem::path& path, open_permissions perm, std::filesystem::perms created = default_file_perms_created, create_options options = create_options::none);
-	bool create_directory(const sftp_session& session, const std::filesystem::path& path, std::filesystem::perms created = default_dir_perms_created);
-	sftp_handle open(const sftp_session& session, const std::filesystem::path& path, open_permissions perm);
-	std::uintmax_t file_size(const sftp_handle& handle);
-	std::filesystem::file_status status(const sftp_handle& handle);
-	//void copy(const sftp_handle& from, const std::filesystem::path& to, std::filesystem::copy_options options = std::filesystem::copy_options::none);
-	//void permissions(const sftp_handle& handle, std::filesystem::perms perms, std::filesystem::perm_options opts = std::filesystem::perm_options::replace);
-	//void rename(const sftp_handle& handle, const std::filesystem::path& new_path);
-	//void remove(sftp_handle&& handle);
+	LINUXPLORER_SSH_API sftp_handle create(const sftp_session& session, const std::filesystem::path& path, open_permissions perm, std::filesystem::perms created = default_file_perms_created, create_options options = create_options::none);
+	LINUXPLORER_SSH_API bool create_directory(const sftp_session& session, const std::filesystem::path& path, std::filesystem::perms created = default_dir_perms_created);
+	LINUXPLORER_SSH_API sftp_handle open(const sftp_session& session, const std::filesystem::path& path, open_permissions perm);
+	LINUXPLORER_SSH_API std::uintmax_t file_size(const sftp_handle& handle);
+	LINUXPLORER_SSH_API std::filesystem::file_status status(const sftp_handle& handle);
+	//LINUXPLORER_SSH_API void copy(const sftp_handle& from, const std::filesystem::path& to, std::filesystem::copy_options options = std::filesystem::copy_options::none);
+	//LINUXPLORER_SSH_API void permissions(const sftp_handle& handle, std::filesystem::perms perms, std::filesystem::perm_options opts = std::filesystem::perm_options::replace);
+	//LINUXPLORER_SSH_API void rename(const sftp_handle& handle, const std::filesystem::path& new_path);
+	//LINUXPLORER_SSH_API void remove(sftp_handle&& handle);
 }
 
-#endif // SFTP_MANIP_HPP
+#endif // LINUXPLORER_SFTP_MANIP_HPP_

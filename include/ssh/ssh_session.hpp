@@ -1,5 +1,7 @@
-#ifndef SSH_SESSION_HPP
-#define SSH_SESSION_HPP
+#ifndef LINUXPLORER_SSH_SESSION_HPP_
+#define LINUXPLORER_SSH_SESSION_HPP_
+
+#include <ssh/sshfwd.hpp>
 
 #include <boost/uuid.hpp>
 #include <winsock2.h>
@@ -58,7 +60,7 @@ namespace linuxplorer::ssh {
 
 	constexpr std::uint16_t default_ssh_port = 22;
 
-	class ssh_session {
+	class LINUXPLORER_SSH_API ssh_session {
 		internal::shared_ssh_session_ptr m_session;
 
 		::libssh2_socket_t m_socket;
@@ -94,4 +96,4 @@ namespace linuxplorer::ssh {
 	};
 }
 
-#endif // SSH_SESSION_HPP
+#endif // LINUXPLORER_SSH_SESSION_HPP_

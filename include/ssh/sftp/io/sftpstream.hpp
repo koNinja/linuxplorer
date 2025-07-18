@@ -1,6 +1,7 @@
-#ifndef SFTPSTREAM_HPP
-#define SFTPSTREAM_HPP
+#ifndef LINUXPLORER_SFTPSTREAM_HPP_
+#define LINUXPLORER_SFTPSTREAM_HPP_
 
+#include <ssh/sshfwd.hpp>
 #include <ssh/sftp/sftp_session.hpp>
 #include <streambuf>
 #include <iosfwd>
@@ -8,7 +9,7 @@
 namespace linuxplorer::ssh::sftp::io {
 	constexpr std::streamsize sftpbuf_default_buffer_size = 0x1000;
 
-	class sftpbuf : public std::basic_streambuf<char> {
+	class LINUXPLORER_SSH_API sftpbuf : public std::basic_streambuf<char> {
 		std::unique_ptr<char_type[]> m_inbuf;
 		std::unique_ptr<char_type[]> m_outbuf;
 		std::streamsize m_inbufsize;
@@ -38,7 +39,7 @@ namespace linuxplorer::ssh::sftp::io {
 
 	constexpr long sftp_default_permissions_created = LIBSSH2_SFTP_S_IFREG | LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IRGRP | LIBSSH2_SFTP_S_IROTH;
 
-	class isftpstream : public std::basic_istream<char> {
+	class LINUXPLORER_SSH_API isftpstream : public std::basic_istream<char> {
 	protected:
 		std::unique_ptr<sftpbuf> m_buffer;
 	public:
@@ -49,7 +50,7 @@ namespace linuxplorer::ssh::sftp::io {
 		virtual ~isftpstream() = default;
 	};
 
-	class osftpstream : public std::basic_ostream<char> {
+	class LINUXPLORER_SSH_API osftpstream : public std::basic_ostream<char> {
 	protected:
 		std::unique_ptr<sftpbuf> m_buffer;
 	public:
@@ -61,4 +62,4 @@ namespace linuxplorer::ssh::sftp::io {
 	};
 }
 
-#endif // SFTPSTREAM_HPP
+#endif // LINUXPLORER_SFTPSTREAM_HPP_

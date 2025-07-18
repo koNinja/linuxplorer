@@ -1,13 +1,14 @@
-#ifndef SFTP_ENTITY_HPP
-#define SFTP_ENTITY_HPP
+#ifndef LINUXPLORER_SFTP_ENTITY_HPP_
+#define LINUXPLORER_SFTP_ENTITY_HPP_
 
+#include <ssh/sshfwd.hpp>
 #include <ssh/ssh_session.hpp>
 #include <ssh/sftp/sftp_session.hpp>
 #include <filesystem>
 #include <memory>
 
 namespace linuxplorer::ssh::sftp::filesystem {
-	class directory_entry {
+	class LINUXPLORER_SSH_API directory_entry {
 	private:
 		std::filesystem::path m_path;
 
@@ -26,7 +27,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		virtual ~directory_entry() = default;
 	};
 
-	class directory_iterator {
+	class LINUXPLORER_SSH_API directory_iterator {
 	public:
 		using iterator_category = std::input_iterator_tag;
 		using value_type = directory_entry;
@@ -63,4 +64,4 @@ namespace linuxplorer::ssh::sftp::filesystem {
 	}
 }
 
-#endif // SFTP_ENTITY_HPP
+#endif // LINUXPLORER_SFTP_ENTITY_HPP_

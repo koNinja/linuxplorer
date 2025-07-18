@@ -1,14 +1,33 @@
-add_library(ssh STATIC)
+add_library(ssh SHARED)
 add_library(linuxplorer::ssh ALIAS ssh)
-target_link_libraries(ssh PUBLIC libssh2::libssh2 linuxplorer::util::charset Boost::uuid)
-target_sources(ssh PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/ssh_session.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/ssh_address.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/auth/ssh_knownhosts.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/sftp/sftp_session.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/sftp/io/sftpstream.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/sftp/filesystem/sftp_entity.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/sftp/filesystem/sftp_manip.cpp
+set(LINUXPLORER_SHELL_DIR ssh)
+target_compile_definitions(ssh PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN LINUXPLORER_SSH_API_IMPLEMENTATION)
+target_sources(ssh 
+	PRIVATE
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/ssh_session.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/ssh_address.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/auth/ssh_knownhosts.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/sftp_session.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/io/sftpstream.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/filesystem/sftp_entity.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/filesystem/sftp_manip.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/internal/ssh_library_resource_manager.cpp
+	# header
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/internal/ssh_library_resource_manager.hpp
+	PUBLIC
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sshfwd.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/ssh_session.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/ssh_address.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/auth/ssh_knownhosts.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/sftp_session.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/io/sftpstream.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/filesystem/sftp_entity.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/filesystem/sftp_manip.hpp
 )
-target_sources(ssh PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/internal/ssh_library_resource_manager.cpp)
-target_compile_definitions(ssh PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(ssh PUBLIC libssh2::libssh2 linuxplorer::util::charset Boost::uuid ws2_32)
+install(TARGETS ssh
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_SHELL_DIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_SHELL_DIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LINUXPLORER_SHELL_DIR}
+)

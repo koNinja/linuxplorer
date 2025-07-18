@@ -1,6 +1,7 @@
-#ifndef SFTP_SESSION_HPP
-#define SFTP_SESSION_HPP
+#ifndef LINUXPLORER_SFTP_SESSION_HPP_
+#define LINUXPLORER_SFTP_SESSION_HPP_
 
+#include <ssh/sshfwd.hpp>
 #include <ssh/ssh_session.hpp>
 #include <unordered_map>
 #include <libssh2_sftp.h>
@@ -71,7 +72,7 @@ namespace linuxplorer::ssh::sftp {
 		using unqiue_sftp_handle_ptr = std::unique_ptr<internal_sftp_handle_ptr_t, sftp_handle_delete>;
 	}
 	
-	class sftp_session {
+	class LINUXPLORER_SSH_API sftp_session {
 	private:
 		inline static std::unordered_map<boost::uuids::uuid, internal::weak_sftp_session_ptr> s_sessions {};
 
@@ -88,7 +89,7 @@ namespace linuxplorer::ssh::sftp {
 	};
 
 	
-	class sftp_handle {
+	class LINUXPLORER_SSH_API sftp_handle {
 	private:
 		internal::unqiue_sftp_handle_ptr m_handle;
 	public:
@@ -101,4 +102,4 @@ namespace linuxplorer::ssh::sftp {
 	};
 }
 
-#endif // SFTP_SESSION_HPP
+#endif // LINUXPLORER_SFTP_SESSION_HPP_

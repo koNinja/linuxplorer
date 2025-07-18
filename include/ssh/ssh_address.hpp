@@ -1,5 +1,7 @@
-#ifndef SSH_ADDRESS_HPP
-#define SSH_ADDRESS_HPP
+#ifndef LINUXPLORER_SSH_ADDRESS_HPP_
+#define LINUXPLORER_SSH_ADDRESS_HPP_
+
+#include <ssh/sshfwd.hpp>
 
 #include <winsock2.h>
 #include <in6addr.h>
@@ -15,7 +17,7 @@ namespace linuxplorer::ssh {
 		ipv6
 	};
 
-	class ssh_address {
+	class LINUXPLORER_SSH_API ssh_address {
 		std::wstring m_str_addr;
 		std::variant<::in_addr, ::in_addr6> m_bin_addr;
 	public:
@@ -34,4 +36,4 @@ namespace linuxplorer::ssh {
 	};
 }
 
-#endif // SSH_ADDRESS_HPP
+#endif // LINUXPLORER_SSH_ADDRESS_HPP_
