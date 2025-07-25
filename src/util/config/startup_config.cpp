@@ -12,6 +12,7 @@
 #include <shlwapi.h>
 
 #define TO_STRING(x)	#x
+#define STRINGIFY(x)	TO_STRING(x)
 
 namespace linuxplorer::util::config {
 	startup_config::startup_config() {}
@@ -80,7 +81,7 @@ namespace linuxplorer::util::config {
 				std::filesystem::recursive_directory_iterator itr(install_dir);
 				std::filesystem::path src_path;
 				for (const auto& p : itr) {
-					if (p.path().stem().string().compare(TO_STRING(APP_SERVICE_NAME)) == 0) src_path = p;
+					if (p.path().stem().string().compare(STRINGIFY(APP_SERVICE_NAME)) == 0) src_path = p;
 				}
 				if (src_path.empty()) {
 					std::error_code ec(static_cast<int>(std::errc::no_such_file_or_directory), std::generic_category());
