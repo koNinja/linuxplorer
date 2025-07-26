@@ -1,27 +1,48 @@
 add_library(util.charset STATIC)
 add_library(linuxplorer::util::charset ALIAS util.charset)
+set(LINUXPLORER_UTIL_CHARSET_DIR util/charset)
 target_sources(util.charset 
 	PRIVATE 
-	${PROJECT_SOURCE_DIR}/src/util/charset/multibyte_wide_compat_helper.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CHARSET_DIR}/multibyte_wide_compat_helper.cpp
 	PUBLIC
-	${PROJECT_SOURCE_DIR}/include/util/charset/multibyte_wide_compat_helper.hpp
-	${PROJECT_SOURCE_DIR}/include/util/charset/case_insensitive_char_traits.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CHARSET_DIR}/multibyte_wide_compat_helper.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CHARSET_DIR}/case_insensitive_char_traits.hpp
+)
+install(TARGETS util.charset
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_UTIL_CHARSET_DIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_UTIL_CHARSET_DIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LINUXPLORER_UTIL_CHARSET_DIR}
 )
 
-add_library(util.config STATIC)
+add_library(util.config SHARED)
 add_library(linuxplorer::util::config ALIAS util.config)
-target_compile_definitions(util.config PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX PROJECT_INSTALL_DIR=${CMAKE_INSTALL_PREFIX} APP_SERVICE_NAME=${APP_SERVICE_NAME})
+set(LINUXPLORER_UTIL_CONFIG_DIR util/config)
+target_compile_definitions(util.config 
+	PRIVATE 
+	WIN32_LEAN_AND_MEAN 
+	NOMINMAX
+	PROJECT_INSTALL_DIR=${ESCAPED_INSTALL_PREFIX}
+	APP_SERVICE_NAME=${APP_SERVICE_NAME}
+	LINUXPLORER_CONFIG_API_IMPLEMENTATION
+)
 target_sources(util.config
 	PRIVATE
-	${PROJECT_SOURCE_DIR}/src/util/config/app_settings.cpp
-	${PROJECT_SOURCE_DIR}/src/util/config/credentials.cpp
-	${PROJECT_SOURCE_DIR}/src/util/config/startup_config.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/app_settings.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/credentials.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/startup_config.cpp
 	PUBLIC
-	${PROJECT_SOURCE_DIR}/include/util/config/app_settings.hpp
-	${PROJECT_SOURCE_DIR}/include/util/config/credentials.hpp
-	${PROJECT_SOURCE_DIR}/include/util/config/startup_config.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/configfwd.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/app_settings.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/credentials.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/startup_config.hpp
 )
 target_link_libraries(util.config 
-	PRIVATE OpenSSL::Crypto OpenSSL::SSL linuxplorer::util::charset crypt32
-	PUBLIC nlohmann_json::nlohmann_json
+	PUBLIC OpenSSL::Crypto OpenSSL::SSL linuxplorer::util::charset crypt32 nlohmann_json::nlohmann_json
+)
+install(TARGETS util.config
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_UTIL_CONFIG_DIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/${LINUXPLORER_UTIL_CONFIG_DIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${LINUXPLORER_UTIL_CONFIG_DIR}
 )

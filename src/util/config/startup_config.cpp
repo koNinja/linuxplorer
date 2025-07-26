@@ -1,5 +1,6 @@
 #include <util/config/startup_config.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
+#include <util/charset/case_insensitive_char_traits.hpp>
 
 #include <filesystem>
 
@@ -68,27 +69,34 @@ namespace linuxplorer::util::config {
 	}
 
 	startup_config::json_data_type startup_config::xsave() const {
-		auto path = startup_config::get_startup_file_path();
-		if (this->m_enabled) {
+		auto path = get_startup_file_path();
+		if (this->m_enabled) {	
 			if (!::PathFileExistsW(path.c_str())) {
-				::HRESULT hResult = ::CoInitialize(nullptr);
-				if (FAILED(hResult)) {
-					std::error_code ec(hResult, std::system_category());
-					throw std::system_error(ec, "Failed to initialize COM component on this thread.");
-				}
+				using chichar_traits = linuxplorer::util::charset::case_insensitive_char_traits<char>;
 
-				auto install_dir = charset::multibyte_wide_compat_helper::convert_multibyte_to_wide(configuration_manager::get_install_path());
+				auto install_dir = configuration_manager::get_install_path();
 				std::filesystem::recursive_directory_iterator itr(install_dir);
 				std::filesystem::path src_path;
+
 				for (const auto& p : itr) {
-					if (p.path().stem().string().compare(STRINGIFY(APP_SERVICE_NAME)) == 0) src_path = p;
+					auto stem = p.path().stem().string();
+					std::string_view app_name = STRINGIFY(LINUXPLORER_APP_SERVICE_NAME);
+
+					if (chichar_traits::compare(stem.c_str(), app_name.data(), std::min(stem.size(), app_name.size())) == 0) 
+						src_path = p;
 				}
 				if (src_path.empty()) {
 					std::error_code ec(static_cast<int>(std::errc::no_such_file_or_directory), std::generic_category());
 					throw std::system_error(ec, "No service executable.");
 				}
 
-				hResult = startup_config::create_link_without_co_initialization(src_path.wstring(), get_startup_file_path());
+				::HRESULT hResult = ::CoInitialize(nullptr);
+				if (FAILED(hResult)) {
+					std::error_code ec(hResult, std::system_category());
+					throw std::system_error(ec, "Failed to initialize COM component on this thread.");
+				}
+
+				hResult = startup_config::create_link_without_co_initialization(src_path.wstring(), path);
 				// release COM component before throwing an exception:
 				::CoUninitialize();
 

@@ -1,16 +1,17 @@
-#ifndef STARTUP_CONFIG_HPP
-#define STARTUP_CONFIG_HPP
+#ifndef LINUXPLORER_STARTUP_CONFIG_HPP_
+#define LINUXPLORER_STARTUP_CONFIG_HPP_
 
+#include <util/config/configfwd.hpp>
 #include <util/config/app_settings.hpp>
 
 namespace linuxplorer::util::config {
-	class startup_inconsistency_exception : config_exception {
+	class LINUXPLORER_CONFIG_API startup_inconsistency_exception : config_exception {
 	public:
 		startup_inconsistency_exception(const char* what) : config_exception(what) {}
 		startup_inconsistency_exception(const std::string& what) : config_exception(what) {}
 	};
 
-	class startup_config : public app_configuration<bool, bool> {
+	class LINUXPLORER_CONFIG_API startup_config : public app_configuration<bool, bool> {
 	public:
 		using data_type = bool;
 		using json_data_type = bool;
@@ -33,4 +34,4 @@ namespace linuxplorer::util::config {
 	};
 }
 
-#endif // STARTUP_CONFIG_HPP
+#endif // LINUXPLORER_STARTUP_CONFIG_HPP_

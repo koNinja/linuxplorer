@@ -4,6 +4,7 @@
 #include <Shlwapi.h>
 
 #define TO_STRING(x)	#x
+#define STRINGIFY(x)	TO_STRING(x)
 
 namespace linuxplorer::util::config {
 	std::string configuration_manager::get_config_path() {
@@ -22,7 +23,7 @@ namespace linuxplorer::util::config {
 	}
 
 	std::string configuration_manager::get_install_path() {
-		return TO_STRING(PROJECT_INSTALL_DIR);
+		return STRINGIFY(PROJECT_INSTALL_DIR);
 	}
 
 	void configuration_manager::initialize() {

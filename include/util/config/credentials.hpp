@@ -1,18 +1,19 @@
-#ifndef CREDENTIALS_HPP
-#define CREDENTIALS_HPP
+#ifndef LINUXPLORER_CREDENTIALS_HPP_
+#define LINUXPLORER_CREDENTIALS_HPP_
 
+#include <util/config/configfwd.hpp>
 #include <util/config/app_settings.hpp>
 #include <string>
 #include <string_view>
 
 namespace linuxplorer::util::config {
-	class cryptographic_exception : public std::runtime_error {
+	class LINUXPLORER_CONFIG_API cryptographic_exception : public std::runtime_error {
 	public:
 		cryptographic_exception(const char* what) : std::runtime_error(what) {}
 		cryptographic_exception(const std::string& what) : std::runtime_error(what) {}
 	};
 
-	class credential_info {
+	class LINUXPLORER_CONFIG_API credential_info {
 	private:
 		std::wstring m_host;
 		std::wstring m_username;
@@ -50,7 +51,7 @@ namespace linuxplorer::util::config {
 		return reinterpret_cast<const unsigned char*>(ptr);
 	}
 
-	class credential_config : public app_mtconfig<credential_info, std::string> {
+	class LINUXPLORER_CONFIG_API credential_config : public app_mtconfig<credential_info, std::string> {
 	public:
 		using data_type = credential_info;
 		using json_data_type = std::string;
@@ -135,4 +136,4 @@ namespace linuxplorer::util::config {
 	};
 }
 
-#endif // CREDENTIALS_HPP
+#endif // LINUXPLORER_CREDENTIALS_HPP_
