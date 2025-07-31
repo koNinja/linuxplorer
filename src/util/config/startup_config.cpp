@@ -78,11 +78,13 @@ namespace linuxplorer::util::config {
 				std::filesystem::recursive_directory_iterator itr(install_dir);
 				std::filesystem::path src_path;
 
-				for (const auto& p : itr) {
-					auto stem = p.path().stem().string();
-					std::string_view app_name = STRINGIFY(LINUXPLORER_APP_SERVICE_NAME);
+				std::string app_name = STRINGIFY(LINUXPLORER_APP_SERVICE_NAME);
+				app_name += ".exe";
 
-					if (chichar_traits::compare(stem.c_str(), app_name.data(), std::min(stem.size(), app_name.size())) == 0) 
+				for (const auto& p : itr) {
+					auto stem = p.path().filename().string();
+
+					if (chichar_traits::compare(stem.c_str(), app_name.c_str(), std::min(stem.size(), app_name.size())) == 0) 
 						src_path = p;
 				}
 				if (src_path.empty()) {
