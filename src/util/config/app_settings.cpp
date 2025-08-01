@@ -26,6 +26,21 @@ namespace linuxplorer::util::config {
 		return STRINGIFY(PROJECT_INSTALL_DIR);
 	}
 
+	std::string configuration_manager::get_log_path() {
+		constexpr std::size_t path_len = MAX_PATH;
+		char path[path_len];
+		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
+		if (!rc) {
+			std::error_code ec(::GetLastError(), std::system_category());
+			throw std::system_error(ec, "Failed to get the environment variable: USERPROFILE");
+		}
+
+		std::string result = path;
+		result += "\\.linuxplorer\\logs\\service.log";
+
+		return result;
+	}
+
 	void configuration_manager::initialize() {
 		try {
 				std::ofstream ofs;

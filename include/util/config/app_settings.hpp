@@ -76,6 +76,7 @@ namespace linuxplorer::util::config {
 
 		static std::string get_config_path();
 		static std::string get_install_path();
+		static std::string get_log_path();
 	};
 
 	template <class T, class S>
