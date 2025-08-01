@@ -2,6 +2,7 @@
 #define LINUXPLORER_SSH_ADDRESS_HPP_
 
 #include <ssh/sshfwd.hpp>
+#include <ssh/ssh_exception.hpp>
 
 #include <winsock2.h>
 #include <in6addr.h>
@@ -15,6 +16,12 @@ namespace linuxplorer::ssh {
 	enum class ssh_address_type {
 		ipv4,
 		ipv6
+	};
+
+	class invalid_address_format_exception : public ssh_exception {
+	public:
+		invalid_address_format_exception(const std::string& what) : ssh_exception(what) {}
+		invalid_address_format_exception(const char* what) : ssh_exception(what) {}
 	};
 
 	class LINUXPLORER_SSH_API ssh_address {

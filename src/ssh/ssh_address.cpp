@@ -25,7 +25,7 @@ namespace linuxplorer::ssh {
 			for (size_t i = 1; i <= 4; ++i) {
 				int part = std::stoi(match[i]);
 				if (part < 0 || part > 255) {
-					throw std::invalid_argument("Invalid IP address.");
+					throw invalid_address_format_exception("Invalid IP address format.");
 				}
 			}
 
@@ -39,7 +39,7 @@ namespace linuxplorer::ssh {
 			this->m_bin_addr = bin_addr;
 		}
 		else {
-			throw std::invalid_argument("Invalid IP address.");
+			throw invalid_address_format_exception("Invalid IP address format.");
 		}
 	}
 
