@@ -15,52 +15,6 @@ namespace linuxplorer::shell::filesystem {
 		right.m_handle = INVALID_HANDLE_VALUE;
 	}
 
-	cloud_filter_placeholder cloud_filter_placeholder::internal_create(const cloud_provider_session& session, std::wstring_view relative_path, ::CF_PLACEHOLDER_CREATE_INFO& create_info) {
-		auto filename = relative_path.substr(relative_path.find_last_of(L"\\") + 1);
-		auto dirname = relative_path.substr(0, relative_path.find_last_of(L"\\"));
-
-		std::wstring absolute_dir_path(session.get_sync_root_dir());
-		if (!dirname.empty()) {
-			absolute_dir_path += L"\\";
-			absolute_dir_path += dirname;
-		}
-
-		::DWORD count_of_proceeded_entries = 0;
-		::HRESULT hr = ::CfCreatePlaceholders(
-			absolute_dir_path.c_str(),
-			&create_info,
-			1,
-			::CF_CREATE_FLAGS::CF_CREATE_FLAG_NONE,
-			&count_of_proceeded_entries
-		);
-		if (FAILED(hr) || count_of_proceeded_entries == 0) {
-			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to create a placeholder.");
-		}
-
-		std::wstring absolute_path(session.get_sync_root_dir());
-		absolute_path += L"\\";
-		absolute_path += relative_path;
-
-		cloud_filter_placeholder result;
-		result.m_relative_path = relative_path;
-		result.m_handle = ::CreateFileW(
-			absolute_path.c_str(),
-			0,
-			FILE_SHARE_READ,
-			nullptr,
-			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
-			nullptr
-		);
-		if (result.m_handle == INVALID_HANDLE_VALUE) {
-			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to open placeholder file.");
-		}
-
-		return result;
-	}
-
 	cloud_filter_placeholder cloud_filter_placeholder::create(const cloud_provider_session& session, std::wstring_view relative_path, const ::CF_FS_METADATA& metadata) {		
 		auto filename = relative_path.substr(relative_path.find_last_of(L"\\") + 1);
 		auto dirname = relative_path.substr(0, relative_path.find_last_of(L"\\"));
@@ -69,8 +23,8 @@ namespace linuxplorer::shell::filesystem {
 		create_info.RelativeFileName = filename.data();
 		create_info.FsMetadata = metadata;
 		create_info.FileIdentity = relative_path.data();
-		create_info.FileIdentityLength = static_cast<std::uint32_t>((relative_path.size() + 1) * sizeof(wchar_t));
-		create_info.Flags = ::CF_PLACEHOLDER_CREATE_FLAGS::CF_PLACEHOLDER_CREATE_FLAG_NONE;		
+		create_info.FileIdentityLength = (relative_path.size() + 1) * sizeof(wchar_t);
+		create_info.Flags = ::CF_PLACEHOLDER_CREATE_FLAGS::CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC;		
 
 		std::wstring absolute_dir_path(session.get_sync_root_dir());
 		if (!dirname.empty()) {
@@ -91,7 +45,7 @@ namespace linuxplorer::shell::filesystem {
 			throw std::system_error(ec, "Failed to create a placeholder.");
 		}
 
-		std::wstring absolute_path(session.get_sync_root_dir());
+		std::wstring absolute_path = absolute_dir_path;
 		absolute_path += L"\\";
 		absolute_path += relative_path;
 
@@ -103,7 +57,7 @@ namespace linuxplorer::shell::filesystem {
 			FILE_SHARE_READ,
 			nullptr,
 			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
+			metadata.BasicInfo.FileAttributes,
 			nullptr
 		);
 		if (result.m_handle == INVALID_HANDLE_VALUE) {
@@ -111,11 +65,11 @@ namespace linuxplorer::shell::filesystem {
 			throw std::system_error(ec, "Failed to open placeholder file.");
 		}
 
-		result.m_type = placeholder_type::file;
+		result.m_type = metadata.BasicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY ? placeholder_type::directory : placeholder_type::file;
 		return result;
 	}
 
-	cloud_filter_placeholder cloud_filter_placeholder::create_directory(const cloud_provider_session &session, std::wstring_view relative_path, ::FILE_BASIC_INFO& metadata) {
+	cloud_filter_placeholder cloud_filter_placeholder::create_non_on_demand_directory(const cloud_provider_session &session, std::wstring_view relative_path, const ::FILE_BASIC_INFO& metadata) {
 		std::wstring absolute_path(session.get_sync_root_dir());
 		absolute_path += L"\\";
 		absolute_path += relative_path;
@@ -156,8 +110,7 @@ namespace linuxplorer::shell::filesystem {
 			throw std::system_error(ec, "Failed to set directory metadata.");
 		}
 
-		metadata.FileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
-		succeeded = ::SetFileAttributesW(absolute_path.c_str(), metadata.FileAttributes);
+		succeeded = ::SetFileAttributesW(absolute_path.c_str(), metadata.FileAttributes | FILE_ATTRIBUTE_DIRECTORY);
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
 			throw std::system_error(ec, "Failed to set directory attributes.");
