@@ -31,6 +31,7 @@ namespace linuxplorer::shell {
 		void disconnect();
 
 		std::wstring_view get_sync_root_dir() const noexcept;
+		const ::CF_CONNECTION_KEY& get_connection_key() const noexcept;
 	};
 }
 

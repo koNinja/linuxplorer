@@ -78,5 +78,9 @@ namespace linuxplorer::shell {
 		return this->m_sync_root_dir;
 	}
 
+	const ::CF_CONNECTION_KEY& cloud_provider_session::get_connection_key() const noexcept {
+		return this->m_connection_key;
+	}
+
 	cloud_provider_session::~cloud_provider_session() noexcept {}
 }
