@@ -70,18 +70,15 @@ namespace linuxplorer::ssh::sftp::io {
 			throw ssh_libssh2_sftp_exception(bytes_read, "Failed to read data.");
 		}
 		
-		sftpbuf::int_type result = 0;
 		if (bytes_read == 0) {
-			result = sftpbuf::traits_type::eof();
 			this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get());
+			return sftpbuf::traits_type::eof();
 		}
 		else {
 			this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get() + bytes_read);
 			this->m_in_seek += bytes_read;
-			result = sftpbuf::traits_type::to_int_type(*this->gptr());
+			return sftpbuf::traits_type::to_int_type(*this->gptr());
 		}
-		
-		return result;
 	}
 
 	std::streamsize sftpbuf::xsputn(const sftpbuf::char_type* in, std::streamsize length) {
@@ -110,17 +107,17 @@ namespace linuxplorer::ssh::sftp::io {
 			return sftpbuf::traits_type::eof();
 		}
 
-		sftpbuf::int_type result = sftpbuf::traits_type::not_eof(ch);
 		::libssh2_sftp_seek64(this->m_handle.get_handle(), this->m_out_seek);
-
+		
 		auto bytes_written = ::libssh2_sftp_write(this->m_handle.get_handle(), this->m_outbuf.get(), this->pptr() - this->pbase());
 		if (bytes_written < 0) {
 			throw ssh_libssh2_exception(bytes_written, "Failed to write data.");
 		}
-
+		
 		this->m_out_seek += bytes_written;
 		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
-
+		
+		sftpbuf::int_type result = sftpbuf::traits_type::not_eof(ch);
 		if (!sftpbuf::traits_type::eq_int_type(ch, sftpbuf::traits_type::eof())) {
 			sftpbuf::char_type c = sftpbuf::traits_type::to_char_type(ch);
 

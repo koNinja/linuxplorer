@@ -32,12 +32,24 @@ std::tuple<ssh::ssh_address, std::wstring, std::wstring> get_cert() {
 }
 
 TEST(sftp_manip, stat) {
-	const auto& [addr, user, pass] = get_cert();
-	using namespace linuxplorer;
+	try {
+		const auto& [addr, user, pass] = get_cert();
+		using namespace linuxplorer;
 
-	ssh::ssh_session ss(addr);
-	ss.connect();
-	ss.authenticate(user, pass);
+		ssh::ssh_session ss(addr);
+		ss.connect();
+		ss.authenticate(user, pass);
+
+		ssh::sftp::sftp_session sftp(ss);
+
+		auto stat = ssh::sftp::filesystem::status(sftp, L"/home/koninja/sdir");
+
+		ss.disconnect();
+	}
+	catch (const ssh::ssh_libssh2_exception& e) {
+		std::cerr << "Exception: " << e.code() << ": " << e.what();
+		FAIL();
+	}
 }
 
 TEST(knownhosts, write) {
