@@ -5,7 +5,7 @@
 #include <util/config/app_settings.hpp>
 
 namespace linuxplorer::util::config {
-	class LINUXPLORER_CONFIG_API startup_inconsistency_exception : config_exception {
+	class startup_inconsistency_exception : config_exception {
 	public:
 		startup_inconsistency_exception(const char* what) : config_exception(what) {}
 		startup_inconsistency_exception(const std::string& what) : config_exception(what) {}

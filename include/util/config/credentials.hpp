@@ -7,7 +7,7 @@
 #include <string_view>
 
 namespace linuxplorer::util::config {
-	class LINUXPLORER_CONFIG_API cryptographic_exception : public std::runtime_error {
+	class cryptographic_exception : public std::runtime_error {
 	public:
 		cryptographic_exception(const char* what) : std::runtime_error(what) {}
 		cryptographic_exception(const std::string& what) : std::runtime_error(what) {}

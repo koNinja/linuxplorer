@@ -7,13 +7,13 @@
 #include <nlohmann/json.hpp>
 
 namespace linuxplorer::util::config {
-	class LINUXPLORER_CONFIG_API config_exception : public std::runtime_error {
+	class config_exception : public std::runtime_error {
 	public:
 		config_exception(const char* what) : std::runtime_error(what) {}
 		config_exception(const std::string& what) : std::runtime_error(what) {}
 	};
 
-	class LINUXPLORER_CONFIG_API config_io_exception : public config_exception {
+	class config_io_exception : public config_exception {
 	public:
 		config_io_exception(const char* what) : config_exception(what) {}
 		config_io_exception(const std::string& what) : config_exception(what) {}
