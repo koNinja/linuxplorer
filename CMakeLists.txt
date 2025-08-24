@@ -25,6 +25,9 @@ find_package(libssh2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(boost_uuid CONFIG REQUIRED)
 
+set(LINUXPLORER_APP_MAIN_NAME ${PROJECT_NAME})
+set(LINUXPLORER_APP_SERVICE_NAME lxpsvc)
+
 enable_testing()
 include(GoogleTest)
 include_directories(${LINUXPLORER_INCLUDE_DIR})
