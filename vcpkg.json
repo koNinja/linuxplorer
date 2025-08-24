@@ -1,5 +1,8 @@
 {
   "dependencies": [
-    "gtest"
+    "libssh2",
+    "gtest",
+    "nlohmann-json",
+    "boost-uuid"
   ]
 }
