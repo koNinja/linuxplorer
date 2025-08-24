@@ -1,0 +1,38 @@
+#ifndef LINUXPLORER_CLOUD_FILTER_PLACEHOLDER_HPP_
+#define LINUXPLORER_CLOUD_FILTER_PLACEHOLDER_HPP_
+
+#include <shell/shellfwd.hpp>
+#include <shell/cloud_provider_session.hpp>
+#include <string>
+
+namespace linuxplorer::shell::filesystem {
+	enum class placeholder_type {
+		file,
+		directory
+	};
+
+	class LINUXPLORER_SHELL_API cloud_filter_placeholder {
+		std::wstring m_relative_path;
+		::HANDLE m_handle;
+		placeholder_type m_type;
+		
+		cloud_filter_placeholder() noexcept;
+		cloud_filter_placeholder(const cloud_filter_placeholder&) = delete;
+
+	public:
+		cloud_filter_placeholder(cloud_filter_placeholder&& right);
+		cloud_filter_placeholder& operator=(cloud_filter_placeholder&& right);
+		static cloud_filter_placeholder create(const cloud_provider_session& session, std::wstring_view relative_path, const ::CF_FS_METADATA& metadata);
+		static cloud_filter_placeholder create_non_on_demand_directory(const cloud_provider_session &session, std::wstring_view relative_path, const ::FILE_BASIC_INFO& metadata);
+		static cloud_filter_placeholder open(const cloud_provider_session& session, std::wstring_view relative_path);
+
+		static void remove(const cloud_provider_session& session, cloud_filter_placeholder&& placeholder);
+
+		virtual ~cloud_filter_placeholder() noexcept;
+
+		void hydrate() const;
+		void dehydrate() const;
+	};
+}
+
+#endif // LINUXPLORER_CLOUD_FILTER_PLACEHOLDER_HPP_

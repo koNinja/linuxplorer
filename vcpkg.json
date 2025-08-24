@@ -1,7 +1,9 @@
 {
   "dependencies": [
     "openssl",
+    "libssh2",
     "gtest",
-    "nlohmann-json"
+    "nlohmann-json",
+    "boost-uuid"
   ]
 }
