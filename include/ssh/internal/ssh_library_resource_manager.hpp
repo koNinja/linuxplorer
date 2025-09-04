@@ -1,7 +1,7 @@
 #ifndef LINUXPLORER_SSH_LIBRARY_RESOURCE_MANAGER_HPP_
 #define LINUXPLORER_SSH_LIBRARY_RESOURCE_MANAGER_HPP_
 
-#ifndef USE_SSH_INTERNAL_LIBRARIES
+#ifndef LINUXPLORER_SSH_API_IMPLEMENTATION
 #ifdef __GNUC__
 #pragma GCC warning "This header file is used only in the implementation of the library."
 #elif _MSC_VER

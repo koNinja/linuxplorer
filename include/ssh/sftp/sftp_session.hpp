@@ -62,7 +62,7 @@ namespace linuxplorer::ssh::sftp {
 		};
 		
 		struct sftp_handle_delete {
-			public:
+		public:
 			void operator()(internal_sftp_handle_ptr_t* ptr) {
 				::libssh2_sftp_close_handle(ptr->ptr());
 				delete ptr;
