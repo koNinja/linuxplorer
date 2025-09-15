@@ -20,27 +20,20 @@ namespace linuxplorer::shell {
 		return *this;
 	}
 
-	void cloud_provider_session::register_callback(const cloud_provider_callback& callback) noexcept {
-		this->m_callbacks.push_back(callback);
-	}
-
-	void cloud_provider_session::register_callbacks(const std::vector<cloud_provider_callback>& callbacks) noexcept {
-		for (const auto& callback : callbacks) {
-			this->m_callbacks.push_back(callback);
-		}
-	}
-
 	void cloud_provider_session::connect() {
 		if (this->m_is_connected) {
 			throw cloud_provider_runtime_exception("Synchronization provider is already running.");
 		}
 
-		std::size_t callback_table_size = this->m_callbacks.size() + 1;
+		std::size_t callback_table_size = this->m_callbacks.size() + this->m_nt_callbacks.size() + 1;
 		auto callback_table = std::make_unique<::CF_CALLBACK_REGISTRATION[]>(callback_table_size);
-		for (std::size_t i = 0; i < callback_table_size - 1; ++i) {
-			callback_table[i].Callback = this->m_callbacks[i].get_callback();
-			
-			callback_table[i].Type = static_cast<::CF_CALLBACK_TYPE>(this->m_callbacks[i].get_type());
+		for (std::size_t i = 0; i < this->m_callbacks.size(); i++) {
+			callback_table[i].Callback = this->m_callbacks[i].get().get_nt_callback();
+			callback_table[i].Type = static_cast<::CF_CALLBACK_TYPE>(this->m_callbacks[i].get().get_type());
+		}
+		for (std::size_t i = this->m_callbacks.size(); i < callback_table_size - 1; i++) {
+			callback_table[i].Callback = this->m_callbacks[i].get().get_nt_callback();
+			callback_table[i].Type = static_cast<::CF_CALLBACK_TYPE>(this->m_callbacks[i].get().get_type());
 		}
 		callback_table[callback_table_size - 1].Callback = nullptr;
 		callback_table[callback_table_size - 1].Type = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NONE;

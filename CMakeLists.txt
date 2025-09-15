@@ -6,6 +6,7 @@ endif()
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(linuxplorer VERSION 1.0.0 LANGUAGES CXX)
@@ -24,6 +25,8 @@ find_package(GTest CONFIG REQUIRED)
 find_package(libssh2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(boost_uuid CONFIG REQUIRED)
+find_package(boost_program_options REQUIRED CONFIG)
+find_package(quill REQUIRED CONFIG)
 
 set(LINUXPLORER_APP_MAIN_NAME ${PROJECT_NAME})
 set(LINUXPLORER_APP_SERVICE_NAME lxpsvc)
@@ -33,4 +36,5 @@ include(GoogleTest)
 include_directories(${LINUXPLORER_INCLUDE_DIR})
 
 add_subdirectory(${LINUXPLORER_SOURCE_DIR})
+add_subdirectory(${LINUXPLORER_APP_DIR})
 # add_subdirectory(${PROJECT_SOURCE_DIR}/test)
