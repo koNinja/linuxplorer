@@ -19,12 +19,7 @@ namespace linuxplorer::util::config {
 	startup_config::startup_config() {}
 
 	long startup_config::create_link_without_co_initialization(const std::wstring& src, const std::wstring& link) noexcept {
-		::HRESULT hResult = E_FAIL;
-
-		hResult = ::CoInitialize(nullptr);
-		if (FAILED(hResult)) {
-			return hResult;
-		}
+		::HRESULT hResult;
 
 		::CComPtr<::IShellLinkW> lpShellLink = nullptr;
 		hResult = ::CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, reinterpret_cast<void**>(&lpShellLink));
@@ -99,8 +94,6 @@ namespace linuxplorer::util::config {
 				}
 
 				hResult = startup_config::create_link_without_co_initialization(src_path.wstring(), path);
-				// release COM component before throwing an exception:
-				::CoUninitialize();
 
 				if (FAILED(hResult)) {
 					std::error_code ec(hResult, std::system_category());
