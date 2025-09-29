@@ -32,270 +32,224 @@ namespace linuxplorer::app::lxpsvc {
 		std::size_t bytes_notify_info_entry_offset = 0;
 		std::size_t bytes_notify_info_entry_diff = 0;
 
-		do {
+		do try {
+			auto info = reinterpret_cast<::FILE_NOTIFY_INFORMATION*>(&bytes_notify_info[bytes_notify_info_entry_offset]);
+
+			bytes_notify_info_entry_diff = info->NextEntryOffset;
+			bytes_notify_info_entry_offset += bytes_notify_info_entry_diff;
+
+			std::wstring_view relative_src_path_view(info->FileName, info->FileNameLength / sizeof(wchar_t));
+			std::wstring absolute_src_path = this->m_syncroot_dir;
+			absolute_src_path += L"\\";
+			absolute_src_path += relative_src_path_view;
+
+			std::wstring dest_path_str = L"/";
+			dest_path_str += relative_src_path_view;
+			std::wstring::iterator itr_dest_path_str;
+			// Replace back slash with slash
+			while ((itr_dest_path_str = std::find(dest_path_str.begin(), dest_path_str.end(), L'\\')) != dest_path_str.end()) {
+				*itr_dest_path_str = L'/';
+			}
+
+			/*
+				Handle file deletion and renaming in this block
+			*/
+			switch (info->Action) {
+			case FILE_ACTION_REMOVED:
 			try {
-				auto info = reinterpret_cast<::FILE_NOTIFY_INFORMATION*>(&bytes_notify_info[bytes_notify_info_entry_offset]);
+				LOG_INFO(s_logger, "Detected file deletion: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 
-				bytes_notify_info_entry_diff = info->NextEntryOffset;
-				bytes_notify_info_entry_offset += bytes_notify_info_entry_diff;
-
-				std::wstring_view relative_src_path_view(info->FileName, info->FileNameLength / sizeof(wchar_t));
-				std::wstring absolute_src_path = this->m_syncroot_dir;
-				absolute_src_path += L"\\";
-				absolute_src_path += relative_src_path_view;
-
-				std::wstring dest_path_str = L"/";
-				dest_path_str += relative_src_path_view;
-				std::wstring::iterator itr_dest_path_str;
-				// Replace back slash with slash
-				while ((itr_dest_path_str = std::find(dest_path_str.begin(), dest_path_str.end(), L'\\')) != dest_path_str.end()) {
-					*itr_dest_path_str = L'/';
-				}
-
-				switch (info->Action) {
-				case FILE_ACTION_REMOVED:
+				// Skip sending a request to remove the object corresponding to the placeholder when it doesn't exist in the server.
 				try {
-					LOG_INFO(s_logger, "Detected file deletion: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
-
-					// Skip sending a request to remove the object corresponding to the placeholder when it doesn't exist in the server.
-					try {
-						ssh::sftp::filesystem::status(this->m_sftp_session.value(), dest_path_str);
-					}
-					catch (const ssh::ssh_libssh2_sftp_exception& e) {
-						continue;
-					}
-
-					ssh::sftp::filesystem::remove(this->m_sftp_session.value(), dest_path_str);
-
-					LOG_INFO(
-						s_logger,
-						"The file '{}' has been successfully removed in server at session #{}.",
-						chcvt::convert_wide_to_multibyte(dest_path_str),
-						this->m_session_id
-					);
-
-					continue;
+					ssh::sftp::filesystem::status(this->m_sftp_session.value(), dest_path_str);
 				}
 				catch (const ssh::ssh_libssh2_sftp_exception& e) {
-					LOG_ERROR(
-						s_logger,
-						"Failed to remove a file '{}' in server at session #{}.",
-						chcvt::convert_wide_to_multibyte(dest_path_str),
-						this->m_session_id
+					continue;
+				}
+
+				ssh::sftp::filesystem::remove(this->m_sftp_session.value(), dest_path_str);
+
+				LOG_INFO(
+					s_logger,
+					"The file '{}' has been successfully removed in server at session #{}.",
+					chcvt::convert_wide_to_multibyte(dest_path_str),
+					this->m_session_id
+				);
+
+				continue;
+			}
+			catch (const ssh::ssh_libssh2_sftp_exception& e) {
+				LOG_ERROR(
+					s_logger,
+					"Failed to remove a file '{}' in server at session #{}.",
+					chcvt::convert_wide_to_multibyte(dest_path_str),
+					this->m_session_id
+				);
+				continue;
+			}
+
+			case FILE_ACTION_RENAMED_OLD_NAME:
+			{
+				old_dest_path_str = std::move(dest_path_str);
+				continue;
+			}
+
+			case FILE_ACTION_RENAMED_NEW_NAME:
+			try {
+				LOG_INFO(s_logger, "Detected renamed file: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+
+				if (!old_dest_path_str.has_value()) {
+					LOG_WARNING(s_logger,
+						"It appear to have missed an event that preserves file's old name.\n"
+							"Cannot send an request to rename the object corresponding to the renamed placeholder."
 					);
-					continue;
 				}
 
-				case FILE_ACTION_RENAMED_OLD_NAME:
-				{
-					old_dest_path_str = std::move(dest_path_str);
-					continue;
-				}
+				ssh::sftp::filesystem::rename(this->m_sftp_session.value(), *old_dest_path_str, dest_path_str);
 
-				case FILE_ACTION_RENAMED_NEW_NAME:
-				try {
-					LOG_INFO(s_logger, "Detected renamed file: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				LOG_INFO(
+					s_logger,
+					"The file '{}' has been successfully renamed to '{}' in server at session #{}.",
+					chcvt::convert_wide_to_multibyte(*old_dest_path_str),
+					chcvt::convert_wide_to_multibyte(dest_path_str),
+					this->m_session_id
+				);
 
-					if (!old_dest_path_str.has_value()) {
-						LOG_WARNING(s_logger,
-							"It appear to have missed an event that preserves file's old name.\n"
-								"Cannot send an request to rename the object corresponding to the renamed placeholder."
+				old_dest_path_str = std::nullopt;
+				
+				continue;
+			}
+			catch (const ssh::ssh_libssh2_sftp_exception& e) {
+				LOG_ERROR(
+					s_logger,
+					"Failed to rename a file '{}' to '{}' in server at session #{}.",
+					chcvt::convert_wide_to_multibyte(*old_dest_path_str),
+					chcvt::convert_wide_to_multibyte(dest_path_str),
+					this->m_session_id
+				);
+				continue;
+			}
+
+			default:
+				break;
+			}
+
+			if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(this->m_cloud_session.value(), relative_src_path_view)) {
+				std::span<const std::byte> identity(reinterpret_cast<const std::byte*>(relative_src_path_view.data()), relative_src_path_view.length() * sizeof(wchar_t));
+
+				shell::filesystem::cloud_filter_placeholder::transform(this->m_cloud_session.value(), relative_src_path_view, identity);
+			}
+
+			shell::filesystem::cloud_filter_placeholder basic_placeholder(this->m_cloud_session.value(), relative_src_path_view);
+
+			/*
+			
+				Handle file modification and creation in this block
+			*/
+			switch (info->Action) {
+			case FILE_ACTION_MODIFIED:
+			try {
+				LOG_INFO(s_logger, "Detected file change of: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+
+				if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) {
+					shell::filesystem::directory_placeholder placeholder(std::move(basic_placeholder));
+
+					if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_UNPINNED) {
+						placeholder.set_pin_state(::CF_PIN_STATE::CF_PIN_STATE_UNSPECIFIED);
+						placeholder.set_enumeration_enabled(true);
+						placeholder.flush();
+
+						LOG_INFO(
+							s_logger,
+							"Directory cache to server-side '{}' have been cleared at session #{}.",
+							chcvt::convert_wide_to_multibyte(dest_path_str),
+							this->m_session_id
 						);
 					}
-
-					ssh::sftp::filesystem::rename(this->m_sftp_session.value(), *old_dest_path_str, dest_path_str);
-
-					LOG_INFO(
-						s_logger,
-						"The file '{}' has been successfully renamed to '{}' in server at session #{}.",
-						chcvt::convert_wide_to_multibyte(*old_dest_path_str),
-						chcvt::convert_wide_to_multibyte(dest_path_str),
-						this->m_session_id
-					);
-
-					old_dest_path_str = std::nullopt;
-					
-					continue;
 				}
-				catch (const ssh::ssh_libssh2_sftp_exception& e) {
-					LOG_ERROR(
-						s_logger,
-						"Failed to rename a file '{}' to '{}' in server at session #{}.",
-						chcvt::convert_wide_to_multibyte(*old_dest_path_str),
-						chcvt::convert_wide_to_multibyte(dest_path_str),
-						this->m_session_id
-					);
-					continue;
-				}
+				else {
+					shell::filesystem::file_placeholder placeholder(std::move(basic_placeholder));
 
-				default:
-					break;
-				}
+					if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_UNPINNED) {
+						placeholder.set_pin_state(::CF_PIN_STATE::CF_PIN_STATE_UNSPECIFIED);
+						placeholder.flush();
+						placeholder.dehydrate();
 
-				if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(this->m_cloud_session.value(), relative_src_path_view)) {
-					std::span<const std::byte> identity(reinterpret_cast<const std::byte*>(relative_src_path_view.data()), relative_src_path_view.length() * sizeof(wchar_t));
+						LOG_INFO(
+							s_logger,
+							"Cache data to server-side '{}' have been cleared at session #{}.",
+							chcvt::convert_wide_to_multibyte(dest_path_str),
+							this->m_session_id
+						);
+					}
+					/*
+						When 'Always keep on this device' is selected in context menu of directory, the system only sets a pinned attribute to the placeholder recursively,
+						so the app should monitor placeholder's attribute changes and respond them.
+					*/
+					// if 'always keep on this device' is selected:
+					else if (placeholder.is_marked_in_sync() && placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_PINNED) {
+						placeholder.hydrate();
+					}
+					// if file data changed:
+					else if (!placeholder.is_marked_in_sync())
+					{
+						auto lock = std::unique_lock(this->m_sftp_mutex);
 
-					shell::filesystem::cloud_filter_placeholder::transform(this->m_cloud_session.value(), relative_src_path_view, identity);
-				}
+						std::ifstream ifs(absolute_src_path);
+						ssh::sftp::io::osftpstream oss(m_sftp_session.value(), dest_path_str, std::ios_base::trunc | std::ios_base::out);
 
-				shell::filesystem::cloud_filter_placeholder basic_placeholder(this->m_cloud_session.value(), relative_src_path_view);
-
-				switch (info->Action) {
-				case FILE_ACTION_MODIFIED:
-				try {
-					LOG_INFO(s_logger, "Detected file change of: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
-
-					if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) {
-						shell::filesystem::directory_placeholder placeholder(std::move(basic_placeholder));
-
-						if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_UNPINNED) {
-							placeholder.set_pin_state(::CF_PIN_STATE::CF_PIN_STATE_UNSPECIFIED);
-							placeholder.set_enumeration_enabled(true);
-							placeholder.flush();
-
-							LOG_INFO(
-								s_logger,
-								"Directory cache to server-side '{}' have been cleared at session #{}.",
-								chcvt::convert_wide_to_multibyte(dest_path_str),
-								this->m_session_id
-							);
+						::LARGE_INTEGER file_size;
+						bool succeeded = ::GetFileSizeEx(placeholder.get_handle(), &file_size);
+						if (!succeeded) {
+							LOG_CRITICAL(s_logger, "Failed to get file size of '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+							continue;
 						}
+
+						constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
+						std::streamsize remaining_bytes = file_size.QuadPart;
+						std::streamsize bytes_read = 0;
+						do {
+							std::size_t buffer_size = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_bytes));
+							auto buffer = std::make_unique<std::byte[]>(buffer_size);
+							ifs.read(reinterpret_cast<char*>(buffer.get()), buffer_size);
+							bytes_read = ifs.gcount();
+							remaining_bytes -= bytes_read;
+							oss.write(reinterpret_cast<char*>(buffer.get()), bytes_read);
+						} while (bytes_read > 0 && remaining_bytes > 0);
+
+						oss.flush();
+
+						placeholder.set_marked_in_sync(true);
+						placeholder.flush();
+
+						LOG_INFO(
+							s_logger,
+							"Changes to client-side file '{}' were successfully applied to server-side '{}' at session #{}.",
+							chcvt::convert_wide_to_multibyte(absolute_src_path),
+							chcvt::convert_wide_to_multibyte(dest_path_str),
+							this->m_session_id
+						);
 					}
 					else {
-						shell::filesystem::file_placeholder placeholder(std::move(basic_placeholder));
-
-						if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_UNPINNED) {
-							placeholder.set_pin_state(::CF_PIN_STATE::CF_PIN_STATE_UNSPECIFIED);
-							placeholder.flush();
-							placeholder.dehydrate();
-
-							LOG_INFO(
-								s_logger,
-								"Cache data to server-side '{}' have been cleared at session #{}.",
-								chcvt::convert_wide_to_multibyte(dest_path_str),
-								this->m_session_id
-							);
-						}
-						/*
-							When 'Always keep on this device' is selected in context menu of directory, the system only sets a pinned attribute to the placeholder recursively,
-							so the app should monitor placeholder's attribute changes and respond them.
-						*/
-						// When the placeholder is pinned and changed locally, the app cannot catch local changes if branch here:
-						// else if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_PINNED) {...}
-						else {
-							// if 'always keep on this device' is selected:
-							if (placeholder.is_marked_in_sync() && placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_PINNED) {
-								placeholder.hydrate();
-							}
-							// if file data changed:
-							else if (!placeholder.is_marked_in_sync())
-							{
-								auto lock = std::unique_lock(this->m_sftp_mutex);
-
-								std::ifstream ifs(absolute_src_path);
-								ssh::sftp::io::osftpstream oss(m_sftp_session.value(), dest_path_str, std::ios_base::trunc | std::ios_base::out);
-
-								::LARGE_INTEGER file_size;
-								bool succeeded = ::GetFileSizeEx(placeholder.get_handle(), &file_size);
-								if (!succeeded) {
-									LOG_CRITICAL(s_logger, "Failed to get file size of '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
-									continue;
-								}
-
-								constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
-								std::streamsize remaining_bytes = file_size.QuadPart;
-								std::streamsize bytes_read = 0;
-								do {
-									std::size_t buffer_size = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_bytes));
-									auto buffer = std::make_unique<std::byte[]>(buffer_size);
-									ifs.read(reinterpret_cast<char*>(buffer.get()), buffer_size);
-									bytes_read = ifs.gcount();
-									remaining_bytes -= bytes_read;
-									oss.write(reinterpret_cast<char*>(buffer.get()), bytes_read);
-								} while (bytes_read > 0 && remaining_bytes > 0);
-
-								oss.flush();
-
-								placeholder.set_marked_in_sync(true);
-								placeholder.flush();
-
-								LOG_INFO(
-									s_logger,
-									"Changes to client-side file '{}' were successfully applied to server-side '{}' at session #{}.",
-									chcvt::convert_wide_to_multibyte(absolute_src_path),
-									chcvt::convert_wide_to_multibyte(dest_path_str),
-									this->m_session_id
-								);
-							}
-							else {
-								LOG_INFO(
-									s_logger,
-									"Ignore changes to client-side file '{}' due to the file is already syncronized, at session #{}.",
-									chcvt::convert_wide_to_multibyte(absolute_src_path),
-									this->m_session_id
-								);
-							}
-						}
+						LOG_INFO(
+							s_logger,
+							"Ignore changes to client-side file '{}' due to the file is already syncronized, at session #{}.",
+							chcvt::convert_wide_to_multibyte(absolute_src_path),
+							this->m_session_id
+						);
 					}
-
-					break;
-				}
-				catch (const ssh::ssh_libssh2_sftp_exception& e) {
-					LOG_ERROR(s_logger, "Failed to transfer file data to server at session #{}.", this->m_session_id);
-					continue;
-				}
-				catch (const std::system_error& e) {
-					LOG_ERROR(
-						s_logger,
-						"Failed a placeholder operation: {} ({}:{}), at session #{}.",
-						e.what(),
-						e.code().value(),
-						e.code().message(),
-						this->m_session_id
-					);
-					continue;
 				}
 
-				case FILE_ACTION_ADDED:
-				try {
-					LOG_INFO(s_logger, "Detected new file: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
-
-					auto lock = std::unique_lock(this->m_sftp_mutex);
-					if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) ssh::sftp::filesystem::create_directory(this->m_sftp_session.value(), dest_path_str);
-					else ssh::sftp::filesystem::create(this->m_sftp_session.value(), dest_path_str, ssh::sftp::filesystem::open_permissions::read);
-
-					basic_placeholder.set_marked_in_sync(true);
-					basic_placeholder.flush();
-
-					LOG_INFO(
-						s_logger,
-						"New client file: '{}' was successfully created on the server as '{}' at session #{}.",
-						chcvt::convert_wide_to_multibyte(absolute_src_path),
-						chcvt::convert_wide_to_multibyte(dest_path_str),
-						this->m_session_id
-					);
-
-					break;
-				}
-				catch (const ssh::ssh_libssh2_sftp_exception& e) {
-					LOG_ERROR(
-						s_logger,
-						"Failed to create a file '{}' corresponding to the file '{}' in server at session #{}.",
-						chcvt::convert_wide_to_multibyte(dest_path_str),
-						chcvt::convert_wide_to_multibyte(absolute_src_path),
-						this->m_session_id
-					);
-					continue;
-				}
-
-				default:
-					break;
-				}
+				break;
+			}
+			catch (const ssh::ssh_libssh2_sftp_exception& e) {
+				LOG_ERROR(s_logger, "Failed to transfer file data to server at session #{}.", this->m_session_id);
+				continue;
 			}
 			catch (const std::system_error& e) {
 				LOG_ERROR(
 					s_logger,
-					"Failed a placeholde operation: {} ({}:{}) at session #{}.",
+					"Failed a placeholder operation: {} ({}:{}), at session #{}.",
 					e.what(),
 					e.code().value(),
 					e.code().message(),
@@ -303,6 +257,52 @@ namespace linuxplorer::app::lxpsvc {
 				);
 				continue;
 			}
+
+			case FILE_ACTION_ADDED:
+			try {
+				LOG_INFO(s_logger, "Detected new file: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+
+				auto lock = std::unique_lock(this->m_sftp_mutex);
+				if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) ssh::sftp::filesystem::create_directory(this->m_sftp_session.value(), dest_path_str);
+				else ssh::sftp::filesystem::create(this->m_sftp_session.value(), dest_path_str, ssh::sftp::filesystem::open_permissions::read);
+
+				basic_placeholder.set_marked_in_sync(true);
+				basic_placeholder.flush();
+
+				LOG_INFO(
+					s_logger,
+					"New client file: '{}' was successfully created on the server as '{}' at session #{}.",
+					chcvt::convert_wide_to_multibyte(absolute_src_path),
+					chcvt::convert_wide_to_multibyte(dest_path_str),
+					this->m_session_id
+				);
+
+				break;
+			}
+			catch (const ssh::ssh_libssh2_sftp_exception& e) {
+				LOG_ERROR(
+					s_logger,
+					"Failed to create a file '{}' corresponding to the file '{}' in server at session #{}.",
+					chcvt::convert_wide_to_multibyte(dest_path_str),
+					chcvt::convert_wide_to_multibyte(absolute_src_path),
+					this->m_session_id
+				);
+				continue;
+			}
+
+			default:
+				break;
+			}
+		} catch (const std::system_error& e) {
+			LOG_ERROR(
+				s_logger,
+				"Failed a placeholder operation: {} ({}:{}), at session #{}.",
+				e.what(),
+				e.code().value(),
+				e.code().message(),
+				this->m_session_id
+			);
+			continue;
 		} while (bytes_notify_info_entry_diff > 0);
 	}
 
@@ -328,7 +328,7 @@ namespace linuxplorer::app::lxpsvc {
 
 		std::filesystem::path absolute_placeholder_path = parameters.get_absolute_placeholder_path();
 
-		// Extract the relative path from path of the sync root directory
+		// Extract a relative path from the sync root directory
 		std::wstring relative_placeholder_path_str;
 		std::wstring_view syncroot_path_str = session_ptr->m_syncroot_dir;
 		if (syncroot_path_str != absolute_placeholder_path) {
@@ -336,7 +336,7 @@ namespace linuxplorer::app::lxpsvc {
 		}
 
 		std::wstring::iterator itr_relative_placeholder_path_str;
-		// Replace back slash with slash
+		// Replace back-slash with slash
 		while ((itr_relative_placeholder_path_str = std::find(
 			relative_placeholder_path_str.begin(), relative_placeholder_path_str.end(), L'\\'))
 			!= relative_placeholder_path_str.end()
@@ -346,8 +346,8 @@ namespace linuxplorer::app::lxpsvc {
 		std::wstring absolute_query_path_str = std::wstring(L"/") + relative_placeholder_path_str;
 		const auto& sftp_session_ptr = session_ptr->get_sftp_session().value();
 
+		std::unique_lock lock(session_ptr->m_sftp_mutex);
 		try {
-			std::unique_lock lock(session_ptr->m_sftp_mutex);
 			
 			ssh::sftp::io::isftpstream iss(sftp_session_ptr, absolute_query_path_str, std::ios_base::in);
 			constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
@@ -355,9 +355,8 @@ namespace linuxplorer::app::lxpsvc {
 			std::streamsize remaining_length = parameters.get_length();
 			std::streamsize current_length = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_length));
 			std::streamsize current_read_length = 0;
-			std::vector<std::byte> data;
 			do {
-				data = std::vector<std::byte>(current_length);
+				std::vector<std::byte> data(current_length);
 
 				LOG_INFO(
 					s_logger,
@@ -393,8 +392,6 @@ namespace linuxplorer::app::lxpsvc {
 			}
 			while (current_read_length > 0 && remaining_length > 0);
 
-			lock.unlock();
-
 			co_return;
 		}
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
@@ -402,7 +399,7 @@ namespace linuxplorer::app::lxpsvc {
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
-			LOG_CRITICAL(s_logger, "Failed to SSH operations at session #{}: {} (libssh2: )", session_ptr->m_session_id, e.what(), e.code());
+			LOG_CRITICAL(s_logger, "Failed to SSH operations at session #{}: {} (libssh2: {})", session_ptr->m_session_id, e.what(), e.code());
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (...) {
@@ -432,7 +429,7 @@ namespace linuxplorer::app::lxpsvc {
 
 		std::filesystem::path absolute_placeholder_path = parameters.get_absolute_placeholder_path();
 
-		// Extract the relative path from path of the sync root directory
+		// Extract a relative path from the sync root directory
 		std::wstring relative_placeholder_path_str;
 		std::wstring_view syncroot_path_str = session_ptr->m_syncroot_dir;
 		if (syncroot_path_str != absolute_placeholder_path) {
@@ -440,13 +437,14 @@ namespace linuxplorer::app::lxpsvc {
 		}
 
 		std::wstring::iterator itr_relative_placeholder_path_str;
-		// Replace back slash with slash
+		// Replace back-slash with slash
 		while ((itr_relative_placeholder_path_str = std::find(
 			relative_placeholder_path_str.begin(), relative_placeholder_path_str.end(), L'\\'))
 			!= relative_placeholder_path_str.end()
 		) {
 			*itr_relative_placeholder_path_str = L'/';
 		}
+		std::replace(relative_placeholder_path_str.begin(), relative_placeholder_path_str.end(), L'\\', L'/');
 		std::wstring absolute_query_dir_path_str = std::wstring(L"/") + relative_placeholder_path_str;
 		const auto& sftp_session_ptr = session_ptr->get_sftp_session().value();
 
