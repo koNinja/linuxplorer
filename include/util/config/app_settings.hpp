@@ -100,7 +100,7 @@ namespace linuxplorer::util::config {
 		virtual void save() const {
 			try {
 				auto value_to_write = this->xsave();
-				configuration_manager::set_value(get_json_key_name(), value_to_write);
+				configuration_manager::set_value(this->get_json_key_name(), value_to_write);
 			}
 			catch (const nlohmann::json::exception& e) {
 				std::stringstream error;

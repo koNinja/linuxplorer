@@ -4,7 +4,9 @@
 #ifdef LINUXPLORER_CONFIG_API_IMPLEMENTATION
 #define LINUXPLORER_CONFIG_API __declspec(dllexport)
 #else
-#define LINUXPLORER_CONFIG_API __declspec(dllimport) 
+#define LINUXPLORER_CONFIG_API __declspec(dllimport)
 #endif // LINUXPLORER_CONFIG_API_IMPLEMENTATION
+
+#define APP_SETTINGS
 
 #endif // LINUXPLORER_CONFIGFWD_HPP_

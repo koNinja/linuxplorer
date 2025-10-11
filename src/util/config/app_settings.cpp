@@ -43,16 +43,17 @@ namespace linuxplorer::util::config {
 
 	void configuration_manager::initialize() {
 		try {
-				std::ofstream ofs;
-				ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-				ofs.open(get_config_path());
-				
-				ofs << "{}" << std::endl;
-			}
-			catch (const std::ios_base::failure& e) {
-				std::stringstream error;
-				error << "File stream failed: " << e.code().message();
-				throw config_io_exception(error.str());
-			}
+			std::ofstream ofs;
+			ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+			ofs.open(get_config_path());
+			
+			ofs << "{}" << std::endl;
+			ofs.flush();
+		}
+		catch (const std::ios_base::failure& e) {
+			std::stringstream error;
+			error << "File stream failed: " << e.code().message();
+			throw config_io_exception(error.str());
+		}
 	}
 }
