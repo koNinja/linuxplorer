@@ -12,7 +12,7 @@ target_sources(${LINUXPLORER_APP_MAIN_NAME} PRIVATE
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_MAIN_NAME}/commands.cpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_MAIN_NAME}/main.cpp
 )
-target_link_libraries(${LINUXPLORER_APP_MAIN_NAME} linuxplorer::ssh linuxplorer::util::charset linuxplorer::util::config Boost::program_options)
+target_link_libraries(${LINUXPLORER_APP_MAIN_NAME} linuxplorer::ssh linuxplorer::util::charset linuxplorer::util::config Boost::program_options shlwapi)
 install(TARGETS ${LINUXPLORER_APP_MAIN_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
