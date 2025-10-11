@@ -49,6 +49,23 @@ namespace linuxplorer::shell::functional {
 		std::size_t get_length() const noexcept;
 	};
 
+	class LINUXPLORER_SHELL_API cancel_fetch_data_callback_parameters : public callback_parameters {
+	private:
+		std::size_t m_offset;
+		std::size_t m_length;
+	public:
+		cancel_fetch_data_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters);
+		cancel_fetch_data_callback_parameters(const cancel_fetch_data_callback_parameters& lhs) = default;
+		cancel_fetch_data_callback_parameters(cancel_fetch_data_callback_parameters&& rhs) = default;
+		virtual ~cancel_fetch_data_callback_parameters() = default;
+
+		cancel_fetch_data_callback_parameters& operator=(const cancel_fetch_data_callback_parameters& lhs) = default;
+		cancel_fetch_data_callback_parameters& operator=(cancel_fetch_data_callback_parameters&& rhs) = default;
+
+		std::size_t get_offset() const noexcept;
+		std::size_t get_length() const noexcept;
+	};
+
 	class operation_info {};
 
 	class LINUXPLORER_SHELL_API fetch_data_operation_info : public operation_info {

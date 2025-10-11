@@ -5,6 +5,7 @@
 #include <shell/cloud_provider_session.hpp>
 #include <shell/filesystem/placeholder_info.hpp>
 #include <string>
+#include <span>
 #include <coroutine>
 
 namespace linuxplorer::shell::filesystem {

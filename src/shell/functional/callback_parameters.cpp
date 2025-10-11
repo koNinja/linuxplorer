@@ -32,6 +32,17 @@ namespace linuxplorer::shell::functional {
 		return this->m_length;
 	}
 
+	cancel_fetch_data_callback_parameters::cancel_fetch_data_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters) : callback_parameters(info, parameters), m_length(parameters->Cancel.FetchData.Length.QuadPart), m_offset(parameters->Cancel.FetchData.FileOffset.QuadPart)
+	{}
+
+	std::size_t cancel_fetch_data_callback_parameters::get_offset() const noexcept {
+		return this->m_offset;
+	}
+
+	std::size_t cancel_fetch_data_callback_parameters::get_length() const noexcept {
+		return this->m_length;
+	}
+
 	std::size_t fetch_data_operation_info::get_offset() const noexcept {
 		return this->m_offset;
 	}

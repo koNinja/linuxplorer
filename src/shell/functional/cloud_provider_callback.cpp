@@ -5,38 +5,11 @@
 #include <ntstatus.h>
 
 namespace linuxplorer::shell::functional {
-	template <cloud_provider_callback_type T>
-	specialized_cloud_provider_callback<T>::specialized_cloud_provider_callback(typed_cloud_provider_callback_t<T> callback) : cloud_provider_callback(T) {
-		if (this_t::s_callback) {
-			throw callback_duplicated_exception(T, "A callback for this type is already registered.");
-		}
-
-		this_t::s_callback = callback;
-	}
-
-	template <cloud_provider_callback_type T>
-	const nt_cloud_provider_callback_t specialized_cloud_provider_callback<T>::get_nt_callback() const noexcept {
-		return this->internal_nt_callback;
-	}
-
-	template <cloud_provider_callback_type T>
-	void specialized_cloud_provider_callback<T>::internal_nt_callback(
-		const ::CF_CALLBACK_INFO* info,
-		const ::CF_CALLBACK_PARAMETERS* parameters
-	) {
-		::CF_OPERATION_INFO operation_info;
-		::ZeroMemory(&operation_info, sizeof(::CF_OPERATION_INFO));
-		::CF_OPERATION_PARAMETERS operation_parameters;
-		::ZeroMemory(&operation_parameters, sizeof(::CF_OPERATION_PARAMETERS));
-		
-		::CfExecute(&operation_info, &operation_parameters);
-	}
-
 	template <>
 	void specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>::internal_nt_callback(
 		const ::CF_CALLBACK_INFO* info,
 		const ::CF_CALLBACK_PARAMETERS* parameters
-	) {
+	) const {
 		::CF_OPERATION_INFO operation_info;
 		::ZeroMemory(&operation_info, sizeof(::CF_OPERATION_INFO));
 		operation_info.StructSize = sizeof(::CF_OPERATION_INFO);
@@ -58,7 +31,7 @@ namespace linuxplorer::shell::functional {
 			// The parameter object may have already been discarded if the function is called late.
 			// Thus the object must be binded by some variable.
 			auto coroutine_parameters = fetch_data_callback_parameters(info, parameters);
-			for (const auto& result : this_t::s_callback(coroutine_parameters)) {
+			for (const auto& result : this->m_callback(coroutine_parameters)) {
 				operation_parameters.TransferData.CompletionStatus = STATUS_SUCCESS;
 				operation_parameters.TransferData.Offset.QuadPart = result.get_offset();
 				operation_parameters.TransferData.Length.QuadPart = result.get_length();
@@ -96,7 +69,7 @@ namespace linuxplorer::shell::functional {
 	void specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>::internal_nt_callback(
 		const ::CF_CALLBACK_INFO* info,
 		const ::CF_CALLBACK_PARAMETERS* parameters
-	) {
+	) const {
 		static std::unordered_map<std::int64_t, std::size_t> s_sum_of_processed_count;
 		auto file_id = info->FileId.QuadPart;
 		auto itr = s_sum_of_processed_count.find(file_id);
@@ -116,8 +89,7 @@ namespace linuxplorer::shell::functional {
 		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, TransferPlaceholders) + sizeof(::CF_OPERATION_PARAMETERS::TransferPlaceholders);
 		
 		try {
-			auto result = this_t::s_callback(callback_parameters(info, parameters));
-			
+			auto result = this->m_callback(callback_parameters(info, parameters));
 			operation_parameters.TransferPlaceholders.CompletionStatus = STATUS_SUCCESS;
 			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
 			size_t placeholder_count = result.get_count_to_be_processed();
@@ -185,11 +157,19 @@ namespace linuxplorer::shell::functional {
 		}
 	}
 
-	template <cloud_provider_callback_type T>
-	void specialized_cloud_provider_callback<T>::clear_callback() noexcept {
-		this_t::s_callback = nullptr;
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		try {
+			this->m_callback(cancel_fetch_data_callback_parameters(info, parameters));
+		}
+		// ignore all
+		catch (...) {}
 	}
 
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
     template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
 }
