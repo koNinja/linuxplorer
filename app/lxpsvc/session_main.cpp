@@ -26,7 +26,7 @@ namespace linuxplorer::app::lxpsvc {
 		}
 		
 		unique_nthandle directory_handle(::CreateFileW(
-			this->m_syncroot_dir,
+			this->m_syncroot_dir.c_str(),
 			FILE_GENERIC_READ | FILE_LIST_DIRECTORY,
 			FILE_SHARE_READ,
 			nullptr,
@@ -47,14 +47,12 @@ namespace linuxplorer::app::lxpsvc {
 			return 1;
 		}
 
+		// Maximum of size of FILE_NOTIFY_INFORMATION structure is estimated about 532 bytes. (path length: 260 (MAX_PATH))
+		// For details: https://learn.microsoft.com/ja-jp/windows/win32/api/winnt/ns-winnt-file_notify_information
+		constexpr ::DWORD supported_file_changes_at_once = 1000;	// by default
+		constexpr ::DWORD notify_info_total_size_bytes = 532 * supported_file_changes_at_once;
+		std::byte bytes_notify_info[notify_info_total_size_bytes];
 		while (true) {
-			// Maximum of size of FILE_NOTIFY_INFORMATION structure is estimated about 532 bytes. (path length: 260 (MAX_PATH))
-			// For details: https://learn.microsoft.com/ja-jp/windows/win32/api/winnt/ns-winnt-file_notify_information
-			constexpr ::DWORD supported_file_changes_at_once = 100;	// by default
-			constexpr ::DWORD notify_info_total_size_bytes = 532 * supported_file_changes_at_once;
-			
-			std::byte bytes_notify_info[notify_info_total_size_bytes];
-
 			constexpr ::DWORD notify_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_SIZE | 
 				FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_ATTRIBUTES;
 
@@ -125,7 +123,7 @@ namespace linuxplorer::app::lxpsvc {
 			case WAIT_FAILED:
 			{
 				std::error_code ec(::GetLastError(), std::system_category());
-				LOG_ERROR(s_logger, "Failed to wait for the terminate event: {}", ec.message());
+				LOG_ERROR(s_logger, "Failed to wait for the terminate event: {}, at session #{}.", ec.message(), this->m_session_id);
 				return 1;
 			}
 			default:

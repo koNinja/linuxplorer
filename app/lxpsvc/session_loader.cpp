@@ -1,6 +1,5 @@
 #include "session.hpp"
 
-#include <util/config/credentials.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 
 #include <ssh/ssh_exception.hpp>
@@ -9,22 +8,23 @@
 #include <ssh/sftp/sftp_session.hpp>
 
 #include <shell/cloud_provider_session.hpp>
-#include <shell/cloud_provider_exception.hpp>
 #include <shell/functional/cloud_provider_callback.hpp>
+#include <shell/cloud_provider_exception.hpp>
 #include <shell/filesystem/cloud_provider_registrar.hpp>
 
 #include <quill/LogMacros.h>
 
+#define GENERATE_CALLBACK_THIS(callback_type, callback)	shell::functional::specialized_cloud_provider_callback<callback_type>([this](const shell::functional::internal::typed_callback_aliases<callback_type>::callback_parameters& parameters) -> shell::functional::internal::typed_callback_aliases<callback_type>::operation_info { return callback(parameters); })
+
 namespace linuxplorer::app::lxpsvc {
-	void session::start() {
+	void session::start() noexcept {
 		try {
 			LOG_INFO(s_logger, "Starting session #{}", this->m_session_id);
 
 			LOG_INFO(s_logger, "Loading configuration for session #{}", this->m_session_id);
-			util::config::credential_config cred_config;
-			cred_config.load();
-			auto cred = cred_config.get();
-			this->m_ssh_session.emplace(ssh::ssh_address(cred.get_host()));
+			const auto& profile = util::config::profile_manager::get(this->m_profile_name);
+
+			this->m_ssh_session.emplace(ssh::ssh_address(profile.get_credential().get_host()), profile.get_port());
 			LOG_INFO(s_logger, "Configuration loaded successfully for session #{}", this->m_session_id);
 
 
@@ -36,10 +36,10 @@ namespace linuxplorer::app::lxpsvc {
 
 			LOG_INFO(s_logger,
 				"Authenticating to SSH server as {} at session #{}", 
-				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(cred.get_username()),
+				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(profile.get_credential().get_username()),
 				this->m_session_id
 			);
-			this->m_ssh_session->authenticate(cred.get_username(), cred.get_password());
+			this->m_ssh_session->authenticate(profile.get_credential().get_username(), profile.get_credential().get_password());
 			LOG_INFO(s_logger, "Authenticated successfully to SSH server at session #{}", this->m_session_id);
 
 
@@ -49,15 +49,19 @@ namespace linuxplorer::app::lxpsvc {
 
 
 			LOG_INFO(s_logger, "Starting cloud provider service at session #{}", this->m_session_id);
+			this->m_syncroot_dir = profile.get_syncroot();
 			shell::filesystem::cp_registration_options options(
 				shell::filesystem::hydration_behavior::progressive_on_demand,
 				shell::filesystem::placeholder_enumeration_behavior::full_on_demand
 			);
 			//shell::filesystem::cloud_provider_registrar::unregister_provider(this->m_syncroot_dir);
-			this->m_cloud_session = shell::filesystem::cloud_provider_registrar::register_provider(this->m_syncroot_dir, this->m_provider_name, this->m_provider_version, options);
+			this->m_cloud_session = shell::filesystem::cloud_provider_registrar::register_provider(this->m_syncroot_dir, s_provider_name, s_provider_version, options);
 			//this->m_cloud_session = shell::cloud_provider_session(this->m_syncroot_dir);
-			this->m_cloud_session->register_callback(shell::functional::fetch_data_callback(session::cloud_providing_callbacks::on_fetch_data));
-			this->m_cloud_session->register_callback(shell::functional::fetch_placeholders_callback(session::cloud_providing_callbacks::on_fetch_placeholders));
+
+			auto fdx = GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_data, this->on_fetch_data);
+			auto fpx = GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_placeholders, this->on_fetch_placeholders);
+			this->m_cloud_session->register_callback(fdx);
+			this->m_cloud_session->register_callback(fpx);
 
 			this->m_cloud_session->connect();
 			LOG_INFO(s_logger, "Cloud provider service started successfully at session #{}", this->m_session_id);
@@ -65,6 +69,7 @@ namespace linuxplorer::app::lxpsvc {
 
 			LOG_INFO(s_logger, "Session #{} is started successfully.", this->m_session_id);
 			this->m_exit_code = this->main();
+			this->stop();
 		}
 		catch (const util::config::config_io_exception& e) {
 			LOG_CRITICAL(s_logger, "Configuration I/O error occurred at session #{}: {}", this->m_session_id, e.what());
@@ -101,7 +106,7 @@ namespace linuxplorer::app::lxpsvc {
 		}
 	}
 
-	void session::stop() {
+	void session::stop() noexcept {
 		try {
 			LOG_INFO(s_logger, "Stopping session #{}", this->m_session_id);
 
@@ -115,16 +120,16 @@ namespace linuxplorer::app::lxpsvc {
 				LOG_INFO(s_logger, "Cloud provider service has been terminated successfully at session #{}", this->m_session_id);
 			}
 
-			s_sessions.remove(this);
 			LOG_INFO(s_logger, "Session #{} stopped.", this->m_session_id);
-
-			//::HRESULT hr = ::CoRevokeClassObject(this->registered);
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
 			LOG_ERROR(s_logger, "Failed to disconnect SSH session at session #{}: {} (libssh2 error code: {})", this->m_session_id, e.what(), e.code());
 		}
 		catch (const shell::cloud_provider_runtime_exception& e) {
 			LOG_ERROR(s_logger, "Cloud provider runtime error occurred at session #{}: {}", this->m_session_id, e.what());
+		}
+		catch (...) {
+			LOG_CRITICAL(s_logger, "Unknown error occurred at session #{}.", this->m_session_id);
 		}
 	}
 }
