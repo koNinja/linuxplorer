@@ -14,14 +14,12 @@
 
 namespace linuxplorer::app::lxpsvc {
 	int session::main() {
-		LOG_INFO(s_logger, "Switch the polling and synchronization process at session #{}.", this->m_session_id);
-
 		unique_nthandle termination_event_handle, changes_detecion_event_handle;
 
 		termination_event_handle.reset(::CreateEventW(nullptr, false, false, WSTRINGIFY(LINUXPLORER_APP_SERVICE_TERMINATE_EVENT_NAME)));
 		if (!termination_event_handle) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			LOG_CRITICAL(s_logger, "Failed to create a termination event at session #{}: {} (GetLastError(): {})", this->m_session_id, ec.message(), ec.value());
+			LOG_CRITICAL(s_logger, "Failed to create a termination event in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
 			return 1;
 		}
 		
@@ -36,14 +34,14 @@ namespace linuxplorer::app::lxpsvc {
 		));
 		if (directory_handle.get() == INVALID_HANDLE_VALUE) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			LOG_CRITICAL(s_logger, "Failed to open sync directory at session #{}: {} (GetLastError(): {})", this->m_session_id, ec.message(), ec.value());
+			LOG_CRITICAL(s_logger, "Failed to open sync directory in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
 			return 1;
 		}
 
 		changes_detecion_event_handle.reset(::CreateEventW(nullptr, true, false, nullptr));
 		if (!changes_detecion_event_handle) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			LOG_CRITICAL(s_logger, "Failed to create a file change surveillance event at session #{}: {} (GetLastError(): {})", this->m_session_id, ec.message(), ec.value());
+			LOG_CRITICAL(s_logger, "Failed to create a file change surveillance event in session #{} (From Win32: {}({})))", this->m_session_id, ec.message(), ec.value());
 			return 1;
 		}
 
@@ -74,7 +72,7 @@ namespace linuxplorer::app::lxpsvc {
 			);
 			if (!succeeded) {
 				std::error_code ec(::GetLastError(), std::system_category());
-				LOG_CRITICAL(s_logger, "Failed to acquire file changes at session #{}: {} (GetLastError: {})", this->m_session_id, ec.message(), ec.value());
+				LOG_CRITICAL(s_logger, "Failed to acquire file changes at session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
 				return 1;
 			}
 
@@ -110,7 +108,7 @@ namespace linuxplorer::app::lxpsvc {
 				);
 				if (!succeeded) {
 					std::error_code ec(::GetLastError(), std::system_category());
-					LOG_ERROR(s_logger, "Failed to catch file changes at session #{}.", this->m_session_id);
+					LOG_ERROR(s_logger, "Failed to catch file changes in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
 					continue;
 				}
 
@@ -123,7 +121,7 @@ namespace linuxplorer::app::lxpsvc {
 			case WAIT_FAILED:
 			{
 				std::error_code ec(::GetLastError(), std::system_category());
-				LOG_ERROR(s_logger, "Failed to wait for the terminate event: {}, at session #{}.", ec.message(), this->m_session_id);
+				LOG_ERROR(s_logger, "Failed to wait for the terminate event in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
 				return 1;
 			}
 			default:

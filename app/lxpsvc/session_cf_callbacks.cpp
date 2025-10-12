@@ -52,7 +52,7 @@ namespace linuxplorer::app::lxpsvc {
 			switch (info->Action) {
 			case FILE_ACTION_REMOVED:
 			try {
-				LOG_INFO(s_logger, "Detected file deletion: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				LOG_INFO(s_logger, "Detected file deletion of '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 
 				// Skip sending a request to remove the object corresponding to the placeholder when it doesn't exist in the server.
 				try {
@@ -66,7 +66,7 @@ namespace linuxplorer::app::lxpsvc {
 
 				LOG_INFO(
 					s_logger,
-					"The file '{}' has been successfully removed in server at session #{}.",
+					"The file '{}' corresponding to the deleted file has been successfully removed from the server in session #{}.",
 					chcvt::convert_wide_to_multibyte(dest_path_str),
 					this->m_session_id
 				);
@@ -76,9 +76,13 @@ namespace linuxplorer::app::lxpsvc {
 			catch (const ssh::ssh_libssh2_sftp_exception& e) {
 				LOG_ERROR(
 					s_logger,
-					"Failed to remove a file '{}' in server at session #{}.",
+					"Failed to remove the file '{}' corresponding to the deleted file from the server in session #{}: {} (libssh2: {}({}))",
 					chcvt::convert_wide_to_multibyte(dest_path_str),
-					this->m_session_id
+					chcvt::convert_wide_to_multibyte(absolute_src_path),
+					this->m_session_id,
+					e.what(),
+					e.code().message(),
+					e.code().value()
 				);
 				continue;
 			}
@@ -91,20 +95,21 @@ namespace linuxplorer::app::lxpsvc {
 
 			case FILE_ACTION_RENAMED_NEW_NAME:
 			try {
-				LOG_INFO(s_logger, "Detected renamed file: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				LOG_INFO(s_logger, "Detected file renaming of '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 
 				if (!old_dest_path_str.has_value()) {
 					LOG_WARNING(s_logger,
-						"It appear to have missed an event that preserves file's old name.\n"
-							"Cannot send an request to rename the object corresponding to the renamed placeholder."
+						"It appear to have missed an event that preserves the file's old name.\n"
+							"Cannot send an request to rename the file corresponding to the renamed placeholder."
 					);
+					continue;
 				}
 
 				ssh::sftp::filesystem::rename(this->m_sftp_session.value(), *old_dest_path_str, dest_path_str);
 
 				LOG_INFO(
 					s_logger,
-					"The file '{}' has been successfully renamed to '{}' in server at session #{}.",
+					"The file '{}' has been successfully renamed to '{}' on the server in session #{}.",
 					chcvt::convert_wide_to_multibyte(*old_dest_path_str),
 					chcvt::convert_wide_to_multibyte(dest_path_str),
 					this->m_session_id
@@ -117,10 +122,13 @@ namespace linuxplorer::app::lxpsvc {
 			catch (const ssh::ssh_libssh2_sftp_exception& e) {
 				LOG_ERROR(
 					s_logger,
-					"Failed to rename a file '{}' to '{}' in server at session #{}.",
+					"Failed to rename the file '{}' to '{}' on the server in session #{}: {} (libssh2: {}({}))",
 					chcvt::convert_wide_to_multibyte(*old_dest_path_str),
 					chcvt::convert_wide_to_multibyte(dest_path_str),
-					this->m_session_id
+					this->m_session_id,
+					e.what(),
+					e.code().message(),
+					e.code().value()
 				);
 				continue;
 			}
@@ -144,7 +152,7 @@ namespace linuxplorer::app::lxpsvc {
 			switch (info->Action) {
 			case FILE_ACTION_MODIFIED:
 			try {
-				LOG_INFO(s_logger, "Detected file change of: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				LOG_INFO(s_logger, "Detected changes to '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 
 				if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) {
 					shell::filesystem::directory_placeholder placeholder(std::move(basic_placeholder));
@@ -156,7 +164,7 @@ namespace linuxplorer::app::lxpsvc {
 
 						LOG_INFO(
 							s_logger,
-							"Directory cache to server-side '{}' have been cleared at session #{}.",
+							"Cache data to '{}' on the server have been cleared in session #{}.",
 							chcvt::convert_wide_to_multibyte(dest_path_str),
 							this->m_session_id
 						);
@@ -172,7 +180,7 @@ namespace linuxplorer::app::lxpsvc {
 
 						LOG_INFO(
 							s_logger,
-							"Cache data to server-side '{}' have been cleared at session #{}.",
+							"Cache data to '{}' on the server have been cleared in session #{}.",
 							chcvt::convert_wide_to_multibyte(dest_path_str),
 							this->m_session_id
 						);
@@ -196,7 +204,7 @@ namespace linuxplorer::app::lxpsvc {
 						::LARGE_INTEGER file_size;
 						bool succeeded = ::GetFileSizeEx(placeholder.get_handle(), &file_size);
 						if (!succeeded) {
-							LOG_CRITICAL(s_logger, "Failed to get file size of '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+							LOG_CRITICAL(s_logger, "Failed to get file size of '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 							continue;
 						}
 
@@ -219,7 +227,7 @@ namespace linuxplorer::app::lxpsvc {
 
 						LOG_INFO(
 							s_logger,
-							"Changes to client-side file '{}' were successfully applied to server-side '{}' at session #{}.",
+							"Changes to the file '{}' have been successfully applied to '{}' on the server in session #{}.",
 							chcvt::convert_wide_to_multibyte(absolute_src_path),
 							chcvt::convert_wide_to_multibyte(dest_path_str),
 							this->m_session_id
@@ -228,7 +236,7 @@ namespace linuxplorer::app::lxpsvc {
 					else {
 						LOG_INFO(
 							s_logger,
-							"Ignore changes to client-side file '{}' due to the file is already syncronized, at session #{}.",
+							"Ignore changes to the file '{}' because it is already synchronized in session #{}.",
 							chcvt::convert_wide_to_multibyte(absolute_src_path),
 							this->m_session_id
 						);
@@ -238,24 +246,31 @@ namespace linuxplorer::app::lxpsvc {
 				break;
 			}
 			catch (const ssh::ssh_libssh2_sftp_exception& e) {
-				LOG_ERROR(s_logger, "Failed to transfer file data to server at session #{}.", this->m_session_id);
+				LOG_ERROR(
+					s_logger,
+					"Failed to transfer file data to the server in session #{}: {} (libssh2: {}({}))",
+					this->m_session_id,
+					e.what(),
+					e.code().message(),
+					e.code().value()
+				);
 				continue;
 			}
 			catch (const std::system_error& e) {
 				LOG_ERROR(
 					s_logger,
-					"Failed a placeholder operation: {} ({}:{}), at session #{}.",
+					"Failed a placeholder operation in session #{}: {} (From Win32: {}({}))",
+					this->m_session_id,
 					e.what(),
-					e.code().value(),
 					e.code().message(),
-					this->m_session_id
+					e.code().value()
 				);
 				continue;
 			}
 
 			case FILE_ACTION_ADDED:
 			try {
-				LOG_INFO(s_logger, "Detected new file: '{}' at session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				LOG_INFO(s_logger, "Detected creation of the file '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 
 				auto lock = std::unique_lock(this->m_sftp_mutex);
 				if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) ssh::sftp::filesystem::create_directory(this->m_sftp_session.value(), dest_path_str);
@@ -266,8 +281,7 @@ namespace linuxplorer::app::lxpsvc {
 
 				LOG_INFO(
 					s_logger,
-					"New client file: '{}' was successfully created on the server as '{}' at session #{}.",
-					chcvt::convert_wide_to_multibyte(absolute_src_path),
+					"The file '{}' corresponding to the new file has been successfully created on the server in session #{}.",
 					chcvt::convert_wide_to_multibyte(dest_path_str),
 					this->m_session_id
 				);
@@ -277,9 +291,8 @@ namespace linuxplorer::app::lxpsvc {
 			catch (const ssh::ssh_libssh2_sftp_exception& e) {
 				LOG_ERROR(
 					s_logger,
-					"Failed to create a file '{}' corresponding to the file '{}' in server at session #{}.",
+					"Failed to create the file '{}' on the server corresponding to the new file in session #{}.",
 					chcvt::convert_wide_to_multibyte(dest_path_str),
-					chcvt::convert_wide_to_multibyte(absolute_src_path),
 					this->m_session_id
 				);
 				continue;
@@ -289,22 +302,22 @@ namespace linuxplorer::app::lxpsvc {
 				break;
 			}
 		} catch (const std::system_error& e) {
-			LOG_ERROR(
-				s_logger,
-				"Failed a placeholder operation: {} ({}:{}), at session #{}.",
-				e.what(),
-				e.code().value(),
-				e.code().message(),
-				this->m_session_id
-			);
-			continue;
+				LOG_ERROR(
+					s_logger,
+					"Failed a placeholder operation in session #{}: {} (From Win32: {}({}))",
+					this->m_session_id,
+					e.what(),
+					e.code().message(),
+					e.code().value()
+				);
+				continue;
 		} while (bytes_notify_info_entry_diff > 0);
 	}
 
 	shell::models::chunked_callback_generator<shell::functional::fetch_data_operation_info> session::on_fetch_data(const shell::functional::fetch_data_callback_parameters& parameters) {
 		using chcvt_helper = util::charset::multibyte_wide_compat_helper;
 
-		LOG_INFO(s_logger, "Fetching data callback invoked by system at session #{}.", this->m_session_id);
+		LOG_INFO(s_logger, "Data fetch requested by the system in session #{}.", this->m_session_id);
 
 		std::filesystem::path absolute_placeholder_path = parameters.get_absolute_placeholder_path();
 
@@ -322,7 +335,7 @@ namespace linuxplorer::app::lxpsvc {
 		std::unique_lock lock(this->m_sftp_mutex);
 		try {
 			ssh::sftp::io::isftpstream iss(this->m_sftp_session.value(), absolute_query_path_str, std::ios_base::in);
-			constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
+			constexpr std::size_t unit_chunk_length = 2097152;	// 2MiB
 			std::size_t current_offset = parameters.get_offset();
 			std::streamsize remaining_length = parameters.get_length();
 			std::streamsize current_length = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_length));
@@ -332,7 +345,7 @@ namespace linuxplorer::app::lxpsvc {
 
 				LOG_INFO(
 					s_logger,
-					"Downloading for '{}', offset: {} bytes, at least length: {} bytes, at session #{}",
+					"Downloading for '{}', offset: {} bytes, at least length: {} bytes, in session #{}",
 					chcvt_helper::convert_wide_to_multibyte(absolute_query_path_str),
 					current_offset,
 					current_length,
@@ -342,14 +355,6 @@ namespace linuxplorer::app::lxpsvc {
 				iss.seekg(current_offset);
 				iss.read(reinterpret_cast<char*>(data.data()), current_length);
 				current_read_length = iss.gcount();
-				
-				LOG_INFO(
-					s_logger,
-					"Successfully downloaded for '{}', length: {} bytes, at session #{}",
-					chcvt_helper::convert_wide_to_multibyte(absolute_query_path_str),
-					current_read_length,
-					this->m_session_id
-				);
 				
 				shell::functional::fetch_data_operation_info result;
 				result.set_buffer(std::move(data));
@@ -367,15 +372,29 @@ namespace linuxplorer::app::lxpsvc {
 			co_return;
 		}
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
-			LOG_CRITICAL(s_logger, "Failed to read file data via isftpstream at session #{}: {} (libssh2: {})", this->m_session_id, e.what(), e.code());
+			LOG_CRITICAL(
+				s_logger,
+				"Failed to read file data via isftpstream in session #{}: {} (libssh2: {}({}))",
+				this->m_session_id,
+				e.what(),
+				e.code().message(),
+				e.code().value()
+			);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
-			LOG_CRITICAL(s_logger, "Failed to SSH operations at session #{}: {} (libssh2: {})", this->m_session_id, e.what(), e.code());
+			LOG_CRITICAL(
+				s_logger,
+				"Failed to SSH operations in session #{}: {} (libssh2: {}({}))",
+				this->m_session_id,
+				e.what(),
+				e.code().message(),
+				e.code().value()
+			);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (...) {
-			LOG_CRITICAL(s_logger, "Unexpected non negligible exception has been thrown at session #{}.", this->m_session_id);
+			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 	}
@@ -383,7 +402,7 @@ namespace linuxplorer::app::lxpsvc {
 	shell::functional::fetch_placeholders_operation_info session::on_fetch_placeholders(const shell::functional::callback_parameters& parameters) {
 		using chcvt_helper = util::charset::multibyte_wide_compat_helper;
 
-		LOG_INFO(s_logger, "Fetching placeholders callback invoked by system at session #{}.", this->m_session_id);
+		LOG_INFO(s_logger, "Placeholder fetch requested by the system in session #{}.", this->m_session_id);
 
 		std::filesystem::path absolute_placeholder_path = parameters.get_absolute_placeholder_path();
 
@@ -429,7 +448,7 @@ namespace linuxplorer::app::lxpsvc {
 							file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE;
 							break;
 						default:
-							LOG_INFO(s_logger, "Skip '{}' due to unknown file type, at session #{}.", absolute_query_entity_path.string(), this->m_session_id);
+							LOG_INFO(s_logger, "Skip '{}' due to unknown file type, in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
 							skipped++;
 							continue;
 					}
@@ -449,18 +468,18 @@ namespace linuxplorer::app::lxpsvc {
 					));
 				}
 				catch (const ssh::ssh_libssh2_sftp_exception& e) {
-					LOG_INFO(s_logger, "Failed to acquire file information and skip '{}', at session #{}.", absolute_query_entity_path.string(), this->m_session_id);
+					LOG_INFO(s_logger, "Failed to get file information and skip '{}', in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
 					skipped++;
 					continue;
 				}
 			}
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
-			LOG_CRITICAL(s_logger, "Failed to enumerate directory entities of '{}', at session #{}.", chcvt_helper::convert_wide_to_multibyte(absolute_query_dir_path_str), this->m_session_id);
+			LOG_CRITICAL(s_logger, "Failed to enumerate directory entities of '{}', in session #{}.", chcvt_helper::convert_wide_to_multibyte(absolute_query_dir_path_str), this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (...) {
-			LOG_CRITICAL(s_logger, "Unexpected non negligible exception has been thrown at session #{}.", this->m_session_id);
+			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 
@@ -469,7 +488,7 @@ namespace linuxplorer::app::lxpsvc {
 		auto placeholder_count = result.get_count_to_be_processed();
 		result.set_total_count_to_be_processed(placeholder_count);
 
-		LOG_INFO(s_logger, "{} placeholders will be created, and {} will be skipped, at session #{}.", placeholder_count, skipped, this->m_session_id);
+		LOG_INFO(s_logger, "{} placeholders will be created, and {} will be skipped, in session #{}.", placeholder_count, skipped, this->m_session_id);
 
 		return result;
 	}

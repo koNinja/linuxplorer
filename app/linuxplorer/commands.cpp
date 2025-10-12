@@ -324,8 +324,6 @@ namespace linuxplorer::app::linuxplorer {
 
 					result.set_syncroot(v);
 					util::config::profile_manager::flush();
-					
-					return 0;
 				}
 				catch (const util::config::config_exception& e) {
 					std::wcerr << L"Configuration loading error: " << e.what() << std::endl;
@@ -349,8 +347,6 @@ namespace linuxplorer::app::linuxplorer {
 
 					result.set_port(port);
 					util::config::profile_manager::flush();
-					
-					return 0;
 				}
 				catch (const util::config::config_exception& e) {
 					std::wcerr << L"Configuration loading error: " << e.what() << std::endl;
@@ -390,6 +386,7 @@ namespace linuxplorer::app::linuxplorer {
 				return 1;
 			}
 
+			std::wcout << L"The setting has been updated successfully." << std::endl;
 			return 0;
 		}
 
@@ -526,7 +523,7 @@ namespace linuxplorer::app::linuxplorer {
 			try {
 				util::config::profile_manager::remove(profile_name);
 				util::config::profile_manager::flush();
-				std::wcout << L"The profile \'" << profile_name << L"\' is unregistered successfully." << std::endl;
+				std::wcout << L"The profile \'" << profile_name << L"\' has been unregistered successfully." << std::endl;
 				return 0;
 			}
 			catch (const util::config::config_exception& e) {
@@ -541,7 +538,7 @@ namespace linuxplorer::app::linuxplorer {
 				util::config::profile profile(profile_name, L"", 22, credential);
 				util::config::profile_manager::add(profile);
 				util::config::profile_manager::flush();
-				std::wcout << L"The profile \'" << profile_name << L"\' is registered successfully." << std::endl;
+				std::wcout << L"The profile \'" << profile_name << L"\' has been registered successfully." << std::endl;
 				return 0;
 			}
 			catch (const util::config::config_exception& e) {
