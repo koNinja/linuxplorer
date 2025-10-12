@@ -3,19 +3,17 @@
 #include <windows.h>
 #include <cfapi.h>
 
-#include <system_error>
-
 namespace linuxplorer::shell::filesystem {
-	cp_registration_options::cp_registration_options(hydration_behavior hydration, placeholder_enumeration_behavior enumeration) {
+	registration_options::registration_options(hydration_behavior hydration, placeholder_enumeration_behavior enumeration) {
 		this->m_hydration_policy = hydration;
 		this->m_placeholder_enumeration_policy = enumeration;
 	}
 
-	hydration_behavior cp_registration_options::get_hydration_behavior() const noexcept {
+	hydration_behavior registration_options::get_hydration_behavior() const noexcept {
 		return this->m_hydration_policy;
 	}
 
-	placeholder_enumeration_behavior cp_registration_options::get_placeholder_enumeration_behavior() const noexcept {
+	placeholder_enumeration_behavior registration_options::get_placeholder_enumeration_behavior() const noexcept {
 		return this->m_placeholder_enumeration_policy;
 	}
 
@@ -23,7 +21,7 @@ namespace linuxplorer::shell::filesystem {
 		std::wstring_view sync_root_dir,
 		std::wstring_view provider_name,
 		std::wstring_view provider_version,
-		const cp_registration_options* options
+		const registration_options* options
 	) {
 		::CF_SYNC_REGISTRATION registration;
 		registration.StructSize = sizeof(::CF_SYNC_REGISTRATION);
@@ -54,7 +52,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to register cloud provider");
+			throw cloud_provider_system_error(ec, "Failed to register cloud provider");
 		}
 
 		return cloud_provider_session(sync_root_dir);
@@ -72,7 +70,7 @@ namespace linuxplorer::shell::filesystem {
 		std::wstring_view sync_root_dir,
 		std::wstring_view provider_name,
 		std::wstring_view provider_version,
-		const cp_registration_options& options
+		const registration_options& options
 	) {
 		return internal_register_provider(sync_root_dir, provider_name, provider_version, &options);
 	}
@@ -81,7 +79,7 @@ namespace linuxplorer::shell::filesystem {
 		::HRESULT hr = ::CfUnregisterSyncRoot(sync_root_dir.data());
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to unregister cloud provider");
+			throw cloud_provider_system_error(ec, "Failed to unregister cloud provider");
 		}
 	}
 }

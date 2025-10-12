@@ -57,6 +57,13 @@ namespace linuxplorer::ssh {
 		connected,
 		disconnected
 	};
+	
+	class ssh_invalid_state_operation : public ssh_invalid_operation_exception {
+	public:
+		explicit ssh_invalid_state_operation(const std::string& what) : ssh_invalid_operation_exception(what) {}
+		explicit ssh_invalid_state_operation(const char* what) : ssh_invalid_operation_exception(what) {}
+		virtual ~ssh_invalid_state_operation() noexcept = default;
+	};
 
 	constexpr std::uint16_t default_ssh_port = 22;
 

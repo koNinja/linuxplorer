@@ -18,10 +18,11 @@ namespace linuxplorer::ssh {
 		ipv6
 	};
 
-	class invalid_address_format_exception : public ssh_exception {
+	class invalid_address_format_exception : public ssh_invalid_operation_exception {
 	public:
-		invalid_address_format_exception(const std::string& what) : ssh_exception(what) {}
-		invalid_address_format_exception(const char* what) : ssh_exception(what) {}
+		explicit invalid_address_format_exception(const std::string& what) : ssh_invalid_operation_exception(what) {}
+		explicit invalid_address_format_exception(const char* what) : ssh_invalid_operation_exception(what) {}
+		virtual ~invalid_address_format_exception() noexcept = default;
 	};
 
 	class LINUXPLORER_SSH_API ssh_address {

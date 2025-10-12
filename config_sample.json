@@ -1,0 +1,11 @@
+{
+	"profiles": [
+		{
+			"name": "server",
+			"syncroot": "\\path\\to\\sync\\root",
+			"port": 22,
+			"credential": "data"
+		}
+	],
+	"startup": true
+}

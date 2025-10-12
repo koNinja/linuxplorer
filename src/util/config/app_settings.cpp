@@ -13,7 +13,7 @@ namespace linuxplorer::util::config {
 		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
 		if (!rc) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to get the environment variable: USERPROFILE");
+			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
 		std::string result = path;
@@ -32,7 +32,7 @@ namespace linuxplorer::util::config {
 		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
 		if (!rc) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to get the environment variable: USERPROFILE");
+			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
 		std::string result = path;
@@ -43,16 +43,17 @@ namespace linuxplorer::util::config {
 
 	void configuration_manager::initialize() {
 		try {
-				std::ofstream ofs;
-				ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-				ofs.open(get_config_path());
-				
-				ofs << "{}" << std::endl;
-			}
-			catch (const std::ios_base::failure& e) {
-				std::stringstream error;
-				error << "File stream failed: " << e.code().message();
-				throw config_io_exception(error.str());
-			}
+			std::ofstream ofs;
+			ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+			ofs.open(get_config_path());
+			
+			ofs << "{}" << std::endl;
+			ofs.flush();
+		}
+		catch (const std::ios_base::failure& e) {
+			std::stringstream error;
+			error << "File stream failed: " << e.code().message();
+			throw config_io_exception(error.str());
+		}
 	}
 }

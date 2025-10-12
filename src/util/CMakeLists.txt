@@ -29,13 +29,13 @@ target_compile_definitions(util.config
 target_sources(util.config
 	PRIVATE
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/app_settings.cpp
-	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/credentials.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/startup_config.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/profiles.cpp
 	PUBLIC
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/configfwd.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/app_settings.hpp
-	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/credentials.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/startup_config.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/profiles.hpp
 )
 target_link_libraries(util.config 
 	PUBLIC OpenSSL::Crypto OpenSSL::SSL linuxplorer::util::charset crypt32 nlohmann_json::nlohmann_json

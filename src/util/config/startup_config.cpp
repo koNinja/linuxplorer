@@ -19,12 +19,7 @@ namespace linuxplorer::util::config {
 	startup_config::startup_config() {}
 
 	long startup_config::create_link_without_co_initialization(const std::wstring& src, const std::wstring& link) noexcept {
-		::HRESULT hResult = E_FAIL;
-
-		hResult = ::CoInitialize(nullptr);
-		if (FAILED(hResult)) {
-			return hResult;
-		}
+		::HRESULT hResult;
 
 		::CComPtr<::IShellLinkW> lpShellLink = nullptr;
 		hResult = ::CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW, reinterpret_cast<void**>(&lpShellLink));
@@ -51,7 +46,7 @@ namespace linuxplorer::util::config {
 		bool succeeded = ::GetEnvironmentVariableW(L"APPDATA", appdata_path, MAX_PATH);
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to get the environment variable: APPDATA");
+			throw config_system_error(ec, "Failed to get the environment variable: APPDATA");
 		}
 		std::wstring startup_path(appdata_path);
 		startup_path += L"\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\linuxplorer.lnk";
@@ -89,22 +84,20 @@ namespace linuxplorer::util::config {
 				}
 				if (src_path.empty()) {
 					std::error_code ec(static_cast<int>(std::errc::no_such_file_or_directory), std::generic_category());
-					throw std::system_error(ec, "No service executable.");
+					throw config_system_error(ec, "No service executable.");
 				}
 
 				::HRESULT hResult = ::CoInitialize(nullptr);
 				if (FAILED(hResult)) {
 					std::error_code ec(hResult, std::system_category());
-					throw std::system_error(ec, "Failed to initialize COM component on this thread.");
+					throw config_system_error(ec, "Failed to initialize COM component on this thread.");
 				}
 
 				hResult = startup_config::create_link_without_co_initialization(src_path.wstring(), path);
-				// release COM component before throwing an exception:
-				::CoUninitialize();
 
 				if (FAILED(hResult)) {
 					std::error_code ec(hResult, std::system_category());
-					throw std::system_error(ec, "Failed to create a startup file.");
+					throw config_system_error(ec, "Failed to create a startup file.");
 				}
 			}
 		}
@@ -113,7 +106,7 @@ namespace linuxplorer::util::config {
 				bool succeeded = ::DeleteFileW(path.c_str());
 				if (!succeeded) {
 					std::error_code ec(::GetLastError(), std::system_category());
-					throw std::system_error(ec, "Failed to delete a startup file.");
+					throw config_system_error(ec, "Failed to delete a startup file.");
 				}
 			}
 		}

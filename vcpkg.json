@@ -4,6 +4,8 @@
     "libssh2",
     "gtest",
     "nlohmann-json",
-    "boost-uuid"
+    "boost-uuid",
+    "boost-program-options",
+    "quill"
   ]
 }

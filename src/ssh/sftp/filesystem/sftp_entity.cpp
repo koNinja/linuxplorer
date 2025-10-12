@@ -22,19 +22,19 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		auto handle = open(session, path, open_permissions::read);
 
 		int bytes_read;
-		std::vector<std::string> paths;
+		std::vector<std::u8string> paths;
 		while (true) {
 			// filename limit is 255 bytes in linux;
-			char buffer[0xFF];
+			char8_t buffer[0xFF];
 			
-			bytes_read = ::libssh2_sftp_readdir_ex(handle.get_handle(), buffer, sizeof(buffer), nullptr, 0, nullptr);
+			bytes_read = ::libssh2_sftp_readdir_ex(handle.get_handle(), reinterpret_cast<char*>(buffer), sizeof(buffer), nullptr, 0, nullptr);
 			if (bytes_read <= 0) break;
 
 			paths.push_back(buffer);
 		}
 		
 		if (bytes_read < 0) {
-			throw ssh_libssh2_exception(bytes_read, "Failed to read directory data.");
+			throw ssh_libssh2_sftp_exception(std::error_code(bytes_read, libssh2_sftp_category()), "Failed to read directory data.");
 		}
 		
 		this->m_ptr = std::make_unique<directory_iterator::value_type[]>(paths.size());

@@ -1,5 +1,3 @@
-#define USE_SSH_INTERNAL_LIBRARIES
-
 #include <ssh/internal/ssh_library_resource_manager.hpp>
 
 #include <libssh2.h>
