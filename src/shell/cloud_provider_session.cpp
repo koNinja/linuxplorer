@@ -3,7 +3,6 @@
 #include <shell/functional/cloud_provider_callback.hpp>
 
 #include <memory>
-#include <system_error>
 
 namespace linuxplorer::shell {
 	cloud_provider_session::cloud_provider_session(std::wstring_view sync_root_dir)
@@ -47,7 +46,7 @@ namespace linuxplorer::shell {
 		this->m_connection_key = key;
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to initiate bi-directional communication between a sync provider and the Cloud Filter API.");
+			throw cloud_provider_system_error(ec, "Failed to initiate bi-directional communication between a sync provider and the Cloud Filter API.");
 		}
 
 		this->m_is_connected = true;
@@ -62,7 +61,7 @@ namespace linuxplorer::shell {
 		::HRESULT hr = ::CfDisconnectSyncRoot(this->m_connection_key.get());
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to disconnect a communication channel.");
+			throw cloud_provider_system_error(ec, "Failed to disconnect a communication channel.");
 		}
 
 		this->m_is_connected = false;

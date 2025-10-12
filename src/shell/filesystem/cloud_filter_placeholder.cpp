@@ -1,8 +1,6 @@
 #include <shell/filesystem/cloud_filter_placeholder.hpp>
 #include <shell/cloud_provider_exception.hpp>
 
-#include <system_error>
-
 using namespace linuxplorer::shell;
 
 namespace linuxplorer::shell::filesystem {
@@ -20,7 +18,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (this->m_handle == INVALID_HANDLE_VALUE) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to open a file.");
+			throw cloud_provider_system_error(ec, "Failed to open a file.");
 		}
 
 		this->fetch();
@@ -69,7 +67,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr) || count_of_proceeded_entries == 0) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to create a placeholder.");
+			throw cloud_provider_system_error(ec, "Failed to create a placeholder.");
 		}
 
 		return cloud_filter_placeholder(session, relative_path);
@@ -91,7 +89,7 @@ namespace linuxplorer::shell::filesystem {
 		));
 		if (handle.get() == INVALID_HANDLE_VALUE) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to open the file.");
+			throw cloud_provider_system_error(ec, "Failed to open the file.");
 		}
 
 		::HRESULT hr = ::CfConvertToPlaceholder(
@@ -104,7 +102,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to convert the existing file or directory to the placeholder.");
+			throw cloud_provider_system_error(ec, "Failed to convert the existing file or directory to the placeholder.");
 		}
 
 		return cloud_filter_placeholder(session, relative_path);
@@ -121,7 +119,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to revert the placeholder back to a regular file.");
+			throw cloud_provider_system_error(ec, "Failed to revert the placeholder back to a regular file.");
 		}
 	}
 
@@ -141,7 +139,7 @@ namespace linuxplorer::shell::filesystem {
 		));
 		if (handle.get() == INVALID_HANDLE_VALUE) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to open the file handle.");
+			throw cloud_provider_system_error(ec, "Failed to open the file handle.");
 		}
 
 		::CF_PLACEHOLDER_BASIC_INFO info;
@@ -158,7 +156,7 @@ namespace linuxplorer::shell::filesystem {
 		constexpr ::HRESULT ERROR_FILE_NOT_CLOUD_FILE = static_cast<::HRESULT>(0x80070178);
 		if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA) && hr != ERROR_FILE_NOT_CLOUD_FILE) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to get placeholder information.");
+			throw cloud_provider_system_error(ec, "Failed to get placeholder information.");
 		}
 
 		return hr != ERROR_FILE_NOT_CLOUD_FILE;
@@ -177,7 +175,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to get placeholder information.");
+			throw cloud_provider_system_error(ec, "Failed to get placeholder information.");
 		}
 
 		std::uint32_t attr = ::GetFileAttributesW(this->m_absolute_path.c_str());
@@ -205,13 +203,13 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to update placeholder information.");
+			throw cloud_provider_system_error(ec, "Failed to update placeholder information.");
 		}
 
 		hr = ::CfSetPinState(this->m_handle, this->m_pin_state, ::CF_SET_PIN_FLAGS::CF_SET_PIN_FLAG_RECURSE, nullptr);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to set the pin state.");
+			throw cloud_provider_system_error(ec, "Failed to set the pin state.");
 		}
 	}
 
@@ -273,7 +271,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (this->m_handle == INVALID_HANDLE_VALUE) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to open a file.");
+			throw cloud_provider_system_error(ec, "Failed to open a file.");
 		}
 
 		co_return;
@@ -304,7 +302,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to the size of the placeholder.");
+			throw cloud_provider_system_error(ec, "Failed to the size of the placeholder.");
 		}
 
 		this->hydrate(0, size.QuadPart);
@@ -323,7 +321,7 @@ namespace linuxplorer::shell::filesystem {
 		::HRESULT hr = ::CfHydratePlaceholder(this->get_handle(), nt_offset, nt_length, ::CF_HYDRATE_FLAGS::CF_HYDRATE_FLAG_NONE, nullptr);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to hydrate placeholder file.");
+			throw cloud_provider_system_error(ec, "Failed to hydrate placeholder file.");
 		}
 	}
 
@@ -336,7 +334,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to the size of the placeholder.");
+			throw cloud_provider_system_error(ec, "Failed to the size of the placeholder.");
 		}
 
 		this->dehydrate(0, size.QuadPart);
@@ -365,7 +363,7 @@ namespace linuxplorer::shell::filesystem {
 			);
 			if (FAILED(hr)) {
 				std::error_code ec(hr, std::system_category());
-				throw std::system_error(ec, "Failed to acquire exclusiveness to prevent data corruption by simultaneously dehydrations.");
+				throw cloud_provider_system_error(ec, "Failed to acquire exclusiveness to prevent data corruption by simultaneously dehydrations.");
 			}
 
 			protected_handle.reset(protected_nthandle);
@@ -378,7 +376,7 @@ namespace linuxplorer::shell::filesystem {
 			hr = ::CfDehydratePlaceholder(protected_handle.get(), nt_offset, nt_length, ::CF_DEHYDRATE_FLAGS::CF_DEHYDRATE_FLAG_NONE, nullptr);
 			if (FAILED(hr)) {
 				std::error_code ec(hr, std::system_category());
-				throw std::system_error(ec, "Failed to dehydrate placeholder file.");
+				throw cloud_provider_system_error(ec, "Failed to dehydrate placeholder file.");
 			}
 		}
 
@@ -410,7 +408,7 @@ namespace linuxplorer::shell::filesystem {
 		);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
-			throw std::system_error(ec, "Failed to update placeholder information.");
+			throw cloud_provider_system_error(ec, "Failed to update placeholder information.");
 		}
 	}
 

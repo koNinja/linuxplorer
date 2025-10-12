@@ -11,7 +11,7 @@ namespace linuxplorer::ssh::sftp {
 		else {
 			::LIBSSH2_SFTP* sftp = ::libssh2_sftp_init(session.get_session());
 			if (!sftp) {
-				throw ssh_libssh2_exception(::libssh2_session_last_errno(session.get_session()), "Failed to initialize a SFTP session.");
+				throw ssh_libssh2_exception(std::error_code(session.get_last_errno(), libssh2_category(session)), "Failed to initialize a SFTP session.");
 			}
 
 			this->m_session = internal::build_sftp_from(sftp, session);

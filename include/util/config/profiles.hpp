@@ -9,10 +9,21 @@
 #include <optional>
 
 namespace linuxplorer::util::config {
-	class cryptographic_exception : public config_exception {
+	class LINUXPLORER_CONFIG_API openssl_category : public std::error_category {
 	public:
-		cryptographic_exception(const char* what) : config_exception(what) {}
-		cryptographic_exception(const std::string& what) : config_exception(what) {}
+		virtual const char* name() const noexcept override;
+		virtual std::string message(int errc) const override;
+	};
+
+	class cryptographic_exception : public config_exception {
+	private:
+		std::error_code m_errc;
+	public:
+		explicit cryptographic_exception(const std::error_code& errc, const char* what) : config_exception(what), m_errc(errc) {}
+		explicit cryptographic_exception(const std::error_code& errc, const std::string& what) : config_exception(what), m_errc(errc) {}
+		virtual ~cryptographic_exception() noexcept = default;
+
+		const std::error_code& code() const noexcept { return this->m_errc; }
 	};
 
 	class LINUXPLORER_CONFIG_API credential {
@@ -185,6 +196,9 @@ namespace linuxplorer::util::config {
 
 		virtual inline constexpr std::string_view get_json_key_name() const noexcept override {
 			return "profiles";
+		}
+		virtual inline std::optional<json_data_type> get_default_value() const noexcept override {
+			return json_data_type{};
 		}
 	};
 

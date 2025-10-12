@@ -31,16 +31,18 @@ namespace linuxplorer::shell::functional {
 		notify_renaming_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_RENAME_COMPLETION			// unused
 	};
 
-	class callback_duplication_exception : public std::runtime_error {
-	public:
-		callback_duplication_exception(cloud_provider_callback_type type, const std::string& message) : 
-			std::runtime_error(message), m_type(type) {}
-		callback_duplication_exception(cloud_provider_callback_type type, const char* message) : 
-			std::runtime_error(message), m_type(type) {}
-
-		inline cloud_provider_callback_type get_type() const noexcept { return this->m_type; }
+	class callback_duplication_exception : public cloud_provider_runtime_exception {
 	private:
 		cloud_provider_callback_type m_type;
+	public:
+		callback_duplication_exception(cloud_provider_callback_type type, const std::string& message) : 
+			cloud_provider_runtime_exception(message), m_type(type) {}
+		callback_duplication_exception(cloud_provider_callback_type type, const char* message) : 
+			cloud_provider_runtime_exception(message), m_type(type) {}
+
+		virtual ~callback_duplication_exception() noexcept = default;
+
+		inline cloud_provider_callback_type get_type() const noexcept { return this->m_type; }
 	};
 
 	namespace internal {
@@ -96,11 +98,12 @@ namespace linuxplorer::shell::functional {
 	using fetch_placeholders_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
 	using cancel_fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
 
-	class callback_abort_exception : public std::runtime_error {
+	class callback_abort_exception {
 	private:
 		::NTSTATUS m_code;
 	public:
-		callback_abort_exception(::NTSTATUS nts, const std::string& message = "") : std::runtime_error(message), m_code(nts) {}
+		callback_abort_exception(::NTSTATUS nts) : m_code(nts) {}
+		virtual ~callback_abort_exception() noexcept = default;
 
 		::NTSTATUS code() const noexcept {
 			return this->m_code;

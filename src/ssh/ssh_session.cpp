@@ -34,20 +34,20 @@ namespace linuxplorer::ssh {
 		if (!internal::ssh_library_resource_manager::is_wsa_initiated()) {
 			int errc = internal::ssh_library_resource_manager::try_initiate_wsa();
 			if (errc != 0) {
-				throw ssh_wsa_exception(errc, "Failed to initiate use of the Winsock DLL by the process.");
+				throw ssh_wsa_exception(std::error_code(errc, std::system_category()), "Failed to initiate use of the Winsock DLL by the process.");
 			}
 		}
 		if (!internal::ssh_library_resource_manager::is_libssh2_initiated()) {
 			int errc = internal::ssh_library_resource_manager::is_libssh2_initiated();
 			if (errc != 0) {
-				throw ssh_libssh2_exception(errc, "Failed to initiate use of the libssh2 by the process.");
+				throw ssh_libssh2_exception(std::error_code(errc, libssh2_category(*this)), "Failed to initiate use of the libssh2 by the process.");
 			}
 		}
 
 		this->m_id = boost::uuids::random_generator()();
 
 		this->m_socket = ::socket(this->m_host.get_type() == ssh_address_type::ipv4 ? AF_INET : AF_INET6, SOCK_STREAM, 0);
-		if (this->m_socket == LIBSSH2_INVALID_SOCKET) throw ssh_wsa_exception(::WSAGetLastError(), "Failed to create a socket.");
+		if (this->m_socket == LIBSSH2_INVALID_SOCKET) throw ssh_wsa_exception(std::error_code(::WSAGetLastError(), std::system_category()), "Failed to create a socket.");
 
 		switch (this->m_host.get_type()) {
 			case linuxplorer::ssh::ssh_address_type::ipv4:
@@ -68,7 +68,7 @@ namespace linuxplorer::ssh {
 
 		this->m_session = internal::build_session_from(::libssh2_session_init());
 		if (this->m_session == nullptr) {
-			throw ssh_libssh2_exception(-1, "Failed to initialize an SSH session object.");
+			throw ssh_libssh2_exception(std::error_code(0, libssh2_category(*this)), "Failed to initialize an SSH session object.");
 		}
 		
 		::libssh2_session_set_blocking(this->m_session->ptr(), true);
@@ -83,12 +83,12 @@ namespace linuxplorer::ssh {
 
 		int result = ::connect(this->m_socket, this->get_sockaddr_ptr(), this->get_sockaddr_length());
 		if (result == SOCKET_ERROR) {
-			throw ssh_wsa_exception(::WSAGetLastError(), "Failed to connect to the SSH server.");
+			throw ssh_wsa_exception(std::error_code(::WSAGetLastError(), std::system_category()), "Failed to connect to the SSH server.");
 		}
 
 		result = ::libssh2_session_handshake(this->m_session->ptr(), this->m_socket);
 		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to perform the SSH handshake.");
+			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(*this)), "Failed to perform the SSH handshake.");
 		}
 
 		this->m_state = ssh_session_state::need_to_authenticate;
@@ -105,7 +105,7 @@ namespace linuxplorer::ssh {
 
 		int result = libssh2_userauth_password(this->m_session->ptr(), charset_helper::convert_wide_to_multibyte(username).c_str(), charset_helper::convert_wide_to_multibyte(password).c_str());
 		if (result != 0) {
-			throw ssh_libssh2_exception(result, "Failed to authenticate.");
+			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(*this)), "Failed to authenticate.");
 		}
 
 		this->m_state = ssh_session_state::connected;

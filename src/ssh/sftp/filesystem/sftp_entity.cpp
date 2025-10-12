@@ -34,7 +34,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		}
 		
 		if (bytes_read < 0) {
-			throw ssh_libssh2_exception(bytes_read, "Failed to read directory data.");
+			throw ssh_libssh2_sftp_exception(std::error_code(bytes_read, libssh2_sftp_category()), "Failed to read directory data.");
 		}
 		
 		this->m_ptr = std::make_unique<directory_iterator::value_type[]>(paths.size());

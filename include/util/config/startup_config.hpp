@@ -7,8 +7,9 @@
 namespace linuxplorer::util::config {
 	class startup_inconsistency_exception : config_exception {
 	public:
-		startup_inconsistency_exception(const char* what) : config_exception(what) {}
-		startup_inconsistency_exception(const std::string& what) : config_exception(what) {}
+		explicit startup_inconsistency_exception(const char* what) : config_exception(what) {}
+		explicit startup_inconsistency_exception(const std::string& what) : config_exception(what) {}
+		virtual ~startup_inconsistency_exception() noexcept = default;
 	};
 
 	class LINUXPLORER_CONFIG_API startup_config : public app_configuration<bool, bool> {
@@ -30,6 +31,9 @@ namespace linuxplorer::util::config {
 
 		virtual inline constexpr std::string_view get_json_key_name() const noexcept override {
 			return "startup";
+		}
+		virtual inline std::optional<json_data_type> get_default_value() const noexcept override {
+			return false;
 		}
 	};
 }

@@ -13,7 +13,7 @@ namespace linuxplorer::util::config {
 		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
 		if (!rc) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to get the environment variable: USERPROFILE");
+			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
 		std::string result = path;
@@ -32,7 +32,7 @@ namespace linuxplorer::util::config {
 		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
 		if (!rc) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to get the environment variable: USERPROFILE");
+			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
 		std::string result = path;

@@ -20,7 +20,7 @@ namespace linuxplorer::ssh::sftp::io {
 		this->m_in_seek = 0;
 		this->m_out_seek = 0;
 
-		if (buffer_size <= 0) throw std::invalid_argument("Invalid buffer size.");
+		if (buffer_size <= 0) throw ssh_invalid_operation_exception("Invalid buffer size.");
 
 		if (used_buffer & std::ios_base::in) {
 			this->m_inbufsize = buffer_size;
@@ -67,7 +67,7 @@ namespace linuxplorer::ssh::sftp::io {
 		::libssh2_sftp_seek64(this->m_handle.get_handle(), this->m_in_seek);
 		auto bytes_read = libssh2_sftp_read(this->m_handle.get_handle(), this->m_inbuf.get(), this->m_inbufsize);
 		if (bytes_read < 0) {
-			throw ssh_libssh2_sftp_exception(bytes_read, "Failed to read data.");
+			throw ssh_libssh2_sftp_exception(std::error_code(bytes_read, libssh2_sftp_category()), "Failed to read data.");
 		}
 		
 		if (bytes_read == 0) {
@@ -111,7 +111,7 @@ namespace linuxplorer::ssh::sftp::io {
 		
 		auto bytes_written = ::libssh2_sftp_write(this->m_handle.get_handle(), this->m_outbuf.get(), this->pptr() - this->pbase());
 		if (bytes_written < 0) {
-			throw ssh_libssh2_exception(bytes_written, "Failed to write data.");
+			throw ssh_libssh2_exception(std::error_code(bytes_written, libssh2_sftp_category()), "Failed to write data.");
 		}
 		
 		this->m_out_seek += bytes_written;
@@ -123,7 +123,7 @@ namespace linuxplorer::ssh::sftp::io {
 
 			auto bytes_append = ::libssh2_sftp_write(this->m_handle.get_handle(), &c, 1);
 			if (bytes_append < 0) {
-				throw ssh_libssh2_exception(bytes_append, "Failed to append the parameter data.");
+				throw ssh_libssh2_exception(std::error_code(bytes_append, libssh2_sftp_category()), "Failed to append the parameter data.");
 			}
 
 			this->m_out_seek += 1;
@@ -170,7 +170,7 @@ namespace linuxplorer::ssh::sftp::io {
 			::LIBSSH2_SFTP_ATTRIBUTES attr;
 			int rc = libssh2_sftp_fstat(this->m_handle.get_handle(), &attr);
 			if (rc < 0) {
-				throw ssh_libssh2_sftp_exception(rc, "Failed to get attributes on an SFTP file handle.");
+				throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get attributes on an SFTP file handle.");
 			}
 			
 			if (which & std::ios_base::in) abs_in_pos = attr.filesize - off;
@@ -224,7 +224,7 @@ namespace linuxplorer::ssh::sftp::io {
 
 		auto handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, LIBSSH2_FXF_READ, LIBSSH2_SFTP_OPENFILE);
 		if (!handle) {
-			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(session.get_last_errno(), libssh2_sftp_category()), "Failed to open file.");
 		}
 
 		this->m_buffer = std::make_unique<sftpbuf>(session, std::move(sftp_handle(session, handle)), std::ios_base::in, sftpbuf_default_buffer_size);
@@ -259,7 +259,7 @@ namespace linuxplorer::ssh::sftp::io {
 
 		auto handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, permissions_created, LIBSSH2_SFTP_OPENFILE);
 		if (!handle) {
-			throw ssh_libssh2_sftp_exception(::libssh2_sftp_last_error(sftp), "Failed to open file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(session.get_last_errno(), libssh2_sftp_category()), "Failed to open file.");
 		}
 
 		this->m_buffer = std::make_unique<sftpbuf>(session,  std::move(sftp_handle(session, handle)), std::ios_base::out, sftpbuf_default_buffer_size);

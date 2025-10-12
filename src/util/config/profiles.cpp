@@ -3,6 +3,7 @@
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 #include <nlohmann/json.hpp>
 #include <nlohmann/byte_container_with_subtype.hpp>
+#include <openssl/err.h>
 #include <openssl/rand.h>
 #include <openssl/aes.h>
 #include <openssl/bio.h>
@@ -37,6 +38,17 @@
 */
 
 namespace linuxplorer::util::config {
+	const char* openssl_category::name() const noexcept {
+		return "openssl_category";
+	}
+	std::string openssl_category::message(int errc) const {
+		constexpr std::size_t static_buffer_length = 1024;
+		char buf[static_buffer_length];
+
+		::ERR_error_string_n(errc, buf, static_buffer_length);
+		return buf;
+	}
+
 	credential::~credential() noexcept {
 		::RtlSecureZeroMemory(this->m_host.data(), this->m_host.size() * sizeof(decltype(this->m_host)::value_type));
 		::RtlSecureZeroMemory(this->m_username.data(), this->m_username.size() * sizeof(decltype(this->m_username)::value_type));
@@ -68,7 +80,7 @@ namespace linuxplorer::util::config {
 		std::size_t bytes_read = ::BIO_read(bio, decoded.get(), decode_length);
 		
 		if (bytes_read == 0 || bytes_read != decode_length) {
-			throw cryptographic_exception("Failed to read the BIO data fully.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to read the BIO data fully.");
 		}
 		::BIO_free_all(bio);
 
@@ -138,7 +150,7 @@ namespace linuxplorer::util::config {
 		bool succeeded = ::CryptUnprotectData(&encrypted_blob, nullptr, nullptr, nullptr, nullptr, 0, &decrypted_blob);
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to decrypt the AES-encrypted-key.");
+			throw config_system_error(ec, "Failed to decrypt the AES-encrypted-key.");
 		}
 
 		decrypted_key.reset(to_byte_ptr(decrypted_blob.pbData));
@@ -159,7 +171,7 @@ namespace linuxplorer::util::config {
 
 		unique_chipher_ctx_ptr_t ctx(::EVP_CIPHER_CTX_new());
 		if (!ctx) {
-			throw cryptographic_exception("Failed to initialize the OpenSSL cipher context.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to initialize the OpenSSL cipher context.");
 		}
 
 		const ::EVP_CIPHER* cipher_suite;
@@ -180,12 +192,12 @@ namespace linuxplorer::util::config {
 		}
 
 		if (!cipher_suite) {
-			throw cryptographic_exception("Failed to get cipher suite.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()),  "Failed to get cipher suite.");
 		}
 
 		int rc = ::EVP_DecryptInit(ctx.get(), cipher_suite, to_byte_ptr(key), to_byte_ptr(iv));
 		if (rc == 0) {
-			throw cryptographic_exception("Failed to initialize the OpenSSL cipher context.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to initialize the OpenSSL cipher context.");
 		}
 
 		decrypted_cred_data = std::make_unique<std::byte[]>(encrypted_cred_data_length);
@@ -193,13 +205,13 @@ namespace linuxplorer::util::config {
 
 		rc = ::EVP_DecryptUpdate(ctx.get(), to_byte_ptr(decrypted_cred_data.get()), &decrypted_cred_multiple_length, to_byte_ptr(encrypted_cred_data), encrypted_cred_data_length);
 		if (rc == 0) {
-			throw cryptographic_exception("Failed to decrypt certification data.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to decrypt certification data.");
 		}
 
 		int decrypted_cred_remaining_length;
 		rc = ::EVP_DecryptFinal_ex(ctx.get(), to_byte_ptr(decrypted_cred_data.get() + decrypted_cred_multiple_length), &decrypted_cred_remaining_length);
 		if (rc == 0) {
-			throw cryptographic_exception("Padding process was failed.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Padding process was failed.");
 		}
 
 		decrypted_cred_data_length = decrypted_cred_multiple_length + decrypted_cred_remaining_length;
@@ -248,7 +260,7 @@ namespace linuxplorer::util::config {
 
 		unique_chipher_ctx_ptr_t ctx(::EVP_CIPHER_CTX_new());
 		if (!ctx) {
-			throw cryptographic_exception("Failed to initialize the OpenSSL cipher context.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to initialize the OpenSSL cipher context.");
 		}
 
 		const ::EVP_CIPHER* cipher_suite;
@@ -269,7 +281,7 @@ namespace linuxplorer::util::config {
 		}
 
 		if (!cipher_suite) {
-			throw cryptographic_exception("Failed to get cipher suite.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to get cipher suite.");
 		}
 
 		key = std::make_unique<std::byte[]>(bytes_key_length);
@@ -278,15 +290,15 @@ namespace linuxplorer::util::config {
 		iv_length = bytes_iv_length;
 
 		if (::RAND_bytes(to_byte_ptr(key.get()), key_length) != 1) {
-			throw cryptographic_exception("Failed to generate an AES key.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to generate an AES key.");
 		}
 		if (::RAND_bytes(to_byte_ptr(iv.get()), iv_length) != 1) {
-			throw cryptographic_exception("Failed to generate an AES IV (aka. initialization vector).");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to generate an AES IV (aka. initialization vector).");
 		}
 
 		int rc = ::EVP_EncryptInit(ctx.get(), cipher_suite, to_byte_ptr(key.get()), to_byte_ptr(iv.get()));
 		if (rc == 0) {
-			throw cryptographic_exception("Failed to construct the OpenSSL cipher context.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to construct the OpenSSL cipher context.");
 		}
 
 		encrypted_cred_data_length = cred_data_length + (profile_config::bytes_aes_block_length - cred_data_length % profile_config::bytes_aes_block_length);
@@ -295,12 +307,12 @@ namespace linuxplorer::util::config {
 		int bytes_written = 0;
 		rc = ::EVP_EncryptUpdate(ctx.get(), to_byte_ptr(encrypted_cred_data.get()), &bytes_written, to_byte_ptr(cred_data), cred_data_length);
 		if (rc == 0) {
-			throw cryptographic_exception("Failed to encrypt data.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to encrypt data.");
 		}
 
 		rc = ::EVP_EncryptFinal_ex(ctx.get(), to_byte_ptr(encrypted_cred_data.get() + bytes_written), &bytes_written);
 		if (rc == 0) {
-			throw cryptographic_exception("Padding process was failed.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Padding process was failed.");
 		}
 	}
 
@@ -321,7 +333,7 @@ namespace linuxplorer::util::config {
 		);
 		if (!succeeded) {
 			std::error_code ec(::GetLastError(), std::system_category());
-			throw std::system_error(ec, "Failed to encrypt the AES key.");
+			throw config_system_error(ec, "Failed to encrypt the AES key.");
 		}
 
 		encrypted_key.reset(to_byte_ptr(encrypted_blob.pbData));
@@ -368,14 +380,14 @@ namespace linuxplorer::util::config {
 		::BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //Ignore newlines - write everything in one line
 		int bytes_written = ::BIO_write(bio, plain, plain_length);
 		if (bytes_written < 0) {
-			throw cryptographic_exception("Failed to write the BIO data.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to write the BIO data.");
 		}
 		::BIO_ctrl(bio, BIO_CTRL_FLUSH, 0, nullptr);
 		
 		char* buffer = nullptr;
 		int buffer_length = ::BIO_ctrl(bio, BIO_CTRL_INFO, 0, &buffer);
 		if (buffer_length < 0) {
-			throw cryptographic_exception("Failed to set a pointer to the start of the memory BIO data.");
+			throw cryptographic_exception(std::error_code(::ERR_peek_last_error(), openssl_category()), "Failed to set a pointer to the start of the memory BIO data.");
 		}
 
 		encoded.assign(buffer, buffer_length / sizeof(char));
@@ -401,7 +413,7 @@ namespace linuxplorer::util::config {
 			std::size_t decoded_raw_cred_length;
 
 			if (raw_cred_length <= 0) {
-				throw config_io_exception("Invalid configuration data.");
+				throw config_json_exception("Invalid configuration data.");
 			}
 
 			profile_config::decode_from_base64(raw_cred, decoded_raw_cred, decoded_raw_cred_length);

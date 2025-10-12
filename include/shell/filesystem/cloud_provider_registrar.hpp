@@ -18,12 +18,12 @@ namespace linuxplorer::shell::filesystem {
 		non_on_demand = ::CF_POPULATION_POLICY_PRIMARY::CF_POPULATION_POLICY_ALWAYS_FULL
 	};
 
-	struct LINUXPLORER_SHELL_API cp_registration_options {
+	struct LINUXPLORER_SHELL_API registration_options {
 	private:
 		hydration_behavior m_hydration_policy;
 		placeholder_enumeration_behavior m_placeholder_enumeration_policy;
 	public:
-		cp_registration_options(hydration_behavior hydration, placeholder_enumeration_behavior enumeration);
+		registration_options(hydration_behavior hydration, placeholder_enumeration_behavior enumeration);
 
 		hydration_behavior get_hydration_behavior() const noexcept;
 		placeholder_enumeration_behavior get_placeholder_enumeration_behavior() const noexcept;
@@ -35,7 +35,7 @@ namespace linuxplorer::shell::filesystem {
 			std::wstring_view sync_root_dir,
 			std::wstring_view provider_name,
 			std::wstring_view provider_version,
-			const cp_registration_options* options
+			const registration_options* options
 		);
 	public:
 		cloud_provider_registrar() = delete;
@@ -53,7 +53,7 @@ namespace linuxplorer::shell::filesystem {
 			std::wstring_view sync_root_dir,
 			std::wstring_view provider_name,
 			std::wstring_view provider_version,
-			const cp_registration_options& options
+			const registration_options& options
 		);
 
 		static void unregister_provider(std::wstring_view sync_root_dir);

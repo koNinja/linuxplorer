@@ -31,7 +31,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		result = ::libssh2_sftp_open_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), flags, static_cast<long>(created), LIBSSH2_SFTP_OPENFILE);
 
 		if (!result) {
-			throw ssh_libssh2_sftp_exception(session.get_last_errno(), "Failed to open a file or directory handle.");
+			throw ssh_libssh2_sftp_exception(std::error_code(session.get_last_errno(), libssh2_sftp_category()), "Failed to open a file or directory handle.");
 		}
 
 		return std::move(sftp_handle(session, result));
@@ -40,10 +40,8 @@ namespace linuxplorer::ssh::sftp::filesystem {
 	bool create_directory(const sftp_session& session, const std::filesystem::path& path, std::filesystem::perms created) {
 		auto p = path.u8string();
 		int rc = ::libssh2_sftp_mkdir_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), static_cast<long>(created));
-		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to make a directory");
-			return false;
-		}
+		if (rc < 0) 
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to make a directory");
 
 		return true;
 	}
@@ -54,7 +52,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr{};
 		int rc = ::libssh2_sftp_stat_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), LIBSSH2_SFTP_STAT, &attr);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get status about an SFTP file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
 		std::uint32_t flags = 0;
@@ -70,7 +68,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 
 		auto result = ::libssh2_sftp_open_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), flags, 0, target);
 		if (!result) {
-			throw ssh_libssh2_sftp_exception(session.get_last_errno(), "Failed to open an SFTP object.");
+			throw ssh_libssh2_sftp_exception(std::error_code(session.get_last_errno(), libssh2_sftp_category()), "Failed to open an SFTP object.");
 		}
 
 		return std::move(sftp_handle(session, result));
@@ -82,7 +80,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr{};
 		int rc = ::libssh2_sftp_stat_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), LIBSSH2_SFTP_STAT, &attr);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get status about an SFTP file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
 		std::filesystem::file_type type;
@@ -147,7 +145,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr{};
 		int rc = ::libssh2_sftp_fstat_ex(handle.get_handle(), &attr, LIBSSH2_SFTP_STAT);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get file attributes.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get file attributes.");
 		}
 
 		std::filesystem::file_type type;
@@ -214,7 +212,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr{};
 		int rc = ::libssh2_sftp_stat_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), LIBSSH2_SFTP_STAT, &attr);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get status about an SFTP file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
 		return attr.filesize;
@@ -224,7 +222,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr;
 		int rc = ::libssh2_sftp_fstat_ex(handle.get_handle(), &attr, 0);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get file attributes.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get file attributes.");
 		}
 
 		return attr.filesize;
@@ -243,7 +241,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			LIBSSH2_SFTP_RENAME_OVERWRITE
 		);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to rename a file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to rename a file.");
 		}
 	}
 
@@ -257,7 +255,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		{
 			int rc = ::libssh2_sftp_unlink_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t));
 			if (rc < 0) {
-				throw ssh_libssh2_sftp_exception(rc, "Failed to remove the file.");
+				throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to remove the file.");
 			}
 			break;
 		}
@@ -265,14 +263,14 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		{
 			int rc = ::libssh2_sftp_rmdir_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t));
 			if (rc < 0) {
-				throw ssh_libssh2_sftp_exception(rc, "Failed to remove the directory");
+				throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to remove the directory");
 			}
 			break;
 		}
 		default:
 		{
 			std::error_code ec(static_cast<int>(std::errc::not_supported), std::generic_category());
-			throw std::system_error(ec, "Not supported file type.");
+			throw ssh_libssh2_sftp_exception(ec, "Not supported file type.");
 			break;
 		}
 		}
@@ -284,7 +282,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr{};
 		int rc = ::libssh2_sftp_stat_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), LIBSSH2_SFTP_STAT, &attr);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get status about an SFTP file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
 		auto utc_lm = std::chrono::file_clock::from_utc(std::chrono::utc_clock::from_sys(std::chrono::system_clock::from_time_t(attr.mtime)));
@@ -298,7 +296,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		::LIBSSH2_SFTP_ATTRIBUTES attr{};
 		int rc = ::libssh2_sftp_stat_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), LIBSSH2_SFTP_STAT, &attr);
 		if (rc < 0) {
-			throw ssh_libssh2_sftp_exception(rc, "Failed to get status about an SFTP file.");
+			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
 		auto utc_la = std::chrono::file_clock::from_utc(std::chrono::utc_clock::from_sys(std::chrono::system_clock::from_time_t(attr.atime)));

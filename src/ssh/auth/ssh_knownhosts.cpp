@@ -3,7 +3,6 @@
 #include <ssh/auth/ssh_knownhosts.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
-#include <fstream>
 
 namespace linuxplorer::ssh::auth {
 	ssh_knownhosts::ssh_knownhosts(const ssh_session& session, std::wstring_view path) : m_session(session) {
@@ -13,14 +12,14 @@ namespace linuxplorer::ssh::auth {
 			std::int32_t userprofile_path_length = ::GetEnvironmentVariableW(L"USERPROFILE", nullptr, 0);
 			if (userprofile_path_length == 0) {
 				std::error_code ec(::GetLastError(), std::system_category());
-				throw std::system_error(ec, "Failed to get user profile path.");
+				throw ssh_system_error(ec, "Failed to get user profile path.");
 			}
 
 			auto userprofile_path = std::make_unique<wchar_t[]>(userprofile_path_length);
 			::DWORD ret = ::GetEnvironmentVariableW(L"USERPROFILE", userprofile_path.get(), userprofile_path_length);
 			if (ret == 0) {
 				std::error_code ec(::GetLastError(), std::system_category());
-				throw std::system_error(ec, "Failed to get user profile path.");
+				throw ssh_system_error(ec, "Failed to get user profile path.");
 			}
 
 			this->m_knownhosts_path = std::move(std::wstring(userprofile_path.get()) + L"\\.ssh\\known_hosts");
@@ -31,12 +30,12 @@ namespace linuxplorer::ssh::auth {
 
 		this->m_knownhosts = internal::unique_ssh_knownhosts_ptr(::libssh2_knownhost_init(this->m_session.get_session()));
 		if (this->m_knownhosts == nullptr) {
-			throw ssh_libssh2_exception(::libssh2_session_last_errno(this->m_session.get_session()), "Failed to initialize known hosts.");
+			throw ssh_libssh2_exception(std::error_code(session.get_last_errno(), libssh2_category(session)), "Failed to initialize known hosts.");
 		}
 
 		int result = libssh2_knownhost_readfile(this->m_knownhosts.get(), charset_helper::convert_wide_to_multibyte(this->m_knownhosts_path).c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
 		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to read known hosts file.");
+			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(session)), "Failed to read known hosts file.");
 		}
 	}
 
@@ -59,7 +58,7 @@ namespace linuxplorer::ssh::auth {
 			nullptr
 		);
 		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to add a known host.");
+			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(this->m_session)), "Failed to add a known host.");
 		}
 	}
 
@@ -79,10 +78,10 @@ namespace linuxplorer::ssh::auth {
 			}
 		}
 		if (rc < 0) {
-			throw ssh_libssh2_exception(rc, "Failed to enumerate known hosts.");
+			throw ssh_libssh2_exception(std::error_code(rc, libssh2_category(this->m_session)), "Failed to enumerate known hosts.");
 		}
 		if (result < 0) {
-			throw ssh_libssh2_exception(result, "Failed to remove a known host.");
+			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(this->m_session)), "Failed to remove a known host.");
 		}
 	}
 
@@ -99,7 +98,7 @@ namespace linuxplorer::ssh::auth {
 			result.push_back(ssh_address(charset_helper::convert_multibyte_to_wide(store->name)));
 		}
 		if (rc < 0) {
-			throw ssh_libssh2_exception(rc, "Failed to enumerate known hosts.");
+			throw ssh_libssh2_exception(std::error_code(rc, libssh2_category(this->m_session)), "Failed to enumerate known hosts.");
 		}
 
 		return std::move(result);
@@ -126,7 +125,7 @@ namespace linuxplorer::ssh::auth {
 
 		switch (result) {
 			case LIBSSH2_KNOWNHOST_CHECK_FAILURE:
-				throw ssh_libssh2_exception(result, "Failed to check known host.");
+				throw ssh_libssh2_exception(std::error_code(result, libssh2_category(this->m_session)), "Failed to check known host.");
 			case LIBSSH2_KNOWNHOST_CHECK_MATCH:
 				return ssh_knownhosts_verify_result::matched;
 			case LIBSSH2_KNOWNHOST_CHECK_MISMATCH:
@@ -134,7 +133,7 @@ namespace linuxplorer::ssh::auth {
 			case LIBSSH2_KNOWNHOST_CHECK_NOTFOUND:
 				return ssh_knownhosts_verify_result::missing;
 			default:
-				throw ssh_libssh2_exception(0, "Unknown known hosts check result.");
+				throw ssh_libssh2_exception(std::error_code(0, libssh2_category(this->m_session)), "Unknown known hosts check result.");
 		}
 	}
 
@@ -143,7 +142,7 @@ namespace linuxplorer::ssh::auth {
 
 		int rc = ::libssh2_knownhost_writefile(this->m_knownhosts.get(), charset_helper::convert_wide_to_multibyte(this->m_knownhosts_path).c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
 		if (rc < 0) {
-			throw ssh_libssh2_exception(rc, "Failed to write data to a known hosts file.");
+			throw ssh_libssh2_exception(std::error_code(rc, libssh2_category(this->m_session)), "Failed to write data to a known hosts file.");
 		}
 	}
 }
