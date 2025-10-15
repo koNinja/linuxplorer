@@ -12,8 +12,8 @@
 #include <shlguid.h>
 #include <shlwapi.h>
 
-#define TO_STRING(x)	#x
-#define STRINGIFY(x)	TO_STRING(x)
+#define TO_WSTRING(x)	L#x
+#define WSTRINGIFY(x)	TO_WSTRING(x)
 
 namespace linuxplorer::util::config {
 	startup_config::startup_config() {}
@@ -67,19 +67,19 @@ namespace linuxplorer::util::config {
 		auto path = get_startup_file_path();
 		if (this->m_enabled) {	
 			if (!::PathFileExistsW(path.c_str())) {
-				using chichar_traits = linuxplorer::util::charset::case_insensitive_char_traits<char>;
+				using wcichar_traits = linuxplorer::util::charset::case_insensitive_char_traits<wchar_t>;
 
 				auto install_dir = configuration_manager::get_install_path();
 				std::filesystem::recursive_directory_iterator itr(install_dir);
 				std::filesystem::path src_path;
 
-				std::string app_name = STRINGIFY(LINUXPLORER_APP_SERVICE_NAME);
-				app_name += ".exe";
+				std::wstring app_name = WSTRINGIFY(LINUXPLORER_APP_SERVICE_NAME);
+				app_name += L".exe";
 
 				for (const auto& p : itr) {
-					auto stem = p.path().filename().string();
+					auto stem = p.path().filename().wstring();
 
-					if (chichar_traits::compare(stem.c_str(), app_name.c_str(), std::min(stem.size(), app_name.size())) == 0) 
+					if (wcichar_traits::compare(stem.c_str(), app_name.c_str(), std::min(stem.size(), app_name.size())) == 0) 
 						src_path = p;
 				}
 				if (src_path.empty()) {
@@ -87,16 +87,10 @@ namespace linuxplorer::util::config {
 					throw config_system_error(ec, "No service executable.");
 				}
 
-				::HRESULT hResult = ::CoInitialize(nullptr);
-				if (FAILED(hResult)) {
-					std::error_code ec(hResult, std::system_category());
-					throw config_system_error(ec, "Failed to initialize COM component on this thread.");
-				}
+				::HRESULT hr = startup_config::create_link_without_co_initialization(src_path.wstring(), path);
 
-				hResult = startup_config::create_link_without_co_initialization(src_path.wstring(), path);
-
-				if (FAILED(hResult)) {
-					std::error_code ec(hResult, std::system_category());
+				if (FAILED(hr)) {
+					std::error_code ec(hr, std::system_category());
 					throw config_system_error(ec, "Failed to create a startup file.");
 				}
 			}

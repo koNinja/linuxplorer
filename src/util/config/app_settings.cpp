@@ -7,36 +7,46 @@
 #define STRINGIFY(x)	TO_STRING(x)
 
 namespace linuxplorer::util::config {
-	std::string configuration_manager::get_config_path() {
+	std::wstring configuration_manager::get_config_path() {
 		constexpr std::size_t path_len = MAX_PATH;
-		char path[path_len];
-		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
+		wchar_t path[path_len];
+		auto rc = ::GetEnvironmentVariableW(L"USERPROFILE", path, path_len);
 		if (!rc) {
 			std::error_code ec(::GetLastError(), std::system_category());
 			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
-		std::string result = path;
-		result += "\\.linuxplorer\\config.json";
+		std::wstring result = path;
+		result += L"\\.linuxplorer\\config.json";
 
 		return result;
 	}
 
-	std::string configuration_manager::get_install_path() {
-		return STRINGIFY(PROJECT_INSTALL_DIR);
+	std::wstring configuration_manager::get_install_path() {
+		constexpr std::size_t path_len = MAX_PATH;
+		wchar_t module_file_path[path_len];
+		auto rc = ::GetModuleFileNameW(nullptr, module_file_path, path_len);
+		if (!rc) {
+			std::error_code ec(::GetLastError(), std::system_category());
+			throw config_system_error(ec, "Failed to retrieve the path for the current process executable.");
+		}
+
+		std::wstring_view view(module_file_path, rc);
+
+		return std::wstring(view.substr(0, view.find_last_of(L'\\')));
 	}
 
-	std::string configuration_manager::get_log_path() {
+	std::wstring configuration_manager::get_log_path() {
 		constexpr std::size_t path_len = MAX_PATH;
-		char path[path_len];
-		auto rc = ::GetEnvironmentVariableA("USERPROFILE", path, path_len);
+		wchar_t path[path_len];
+		auto rc = ::GetEnvironmentVariableW(L"USERPROFILE", path, path_len);
 		if (!rc) {
 			std::error_code ec(::GetLastError(), std::system_category());
 			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
-		std::string result = path;
-		result += "\\.linuxplorer\\logs\\service.log";
+		std::wstring result = path;
+		result += L"\\.linuxplorer\\logs\\service.log";
 
 		return result;
 	}

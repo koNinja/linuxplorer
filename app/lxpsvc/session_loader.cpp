@@ -55,18 +55,10 @@ namespace linuxplorer::app::lxpsvc {
 
 			LOG_INFO(s_logger, "Starting cloud provider service in session #{}.", this->m_session_id);
 			this->m_syncroot_dir = profile.get_syncroot();
-			shell::filesystem::registration_options options(
-				shell::filesystem::hydration_behavior::progressive_on_demand,
-				shell::filesystem::placeholder_enumeration_behavior::full_on_demand
-			);
-			//shell::filesystem::cloud_provider_registrar::unregister_provider(this->m_syncroot_dir);
-			this->m_cloud_session = shell::filesystem::cloud_provider_registrar::register_provider(this->m_syncroot_dir, s_provider_name, s_provider_version, options);
-			//this->m_cloud_session = shell::cloud_provider_session(this->m_syncroot_dir);
+			this->m_cloud_session = shell::cloud_provider_session(this->m_syncroot_dir);
 
-			auto fdx = GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_data, this->on_fetch_data);
-			auto fpx = GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_placeholders, this->on_fetch_placeholders);
-			this->m_cloud_session->register_callback(fdx);
-			this->m_cloud_session->register_callback(fpx);
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_data, this->on_fetch_data));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_placeholders, this->on_fetch_placeholders));
 
 			this->m_cloud_session->connect();
 			LOG_INFO(s_logger, "The cloud provider service started successfully in session #{}.", this->m_session_id);
