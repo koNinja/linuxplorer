@@ -431,7 +431,14 @@ namespace linuxplorer::app::lxpsvc {
 				std::filesystem::path absolute_query_entity_path = absolute_query_dir_path_str;
 				absolute_query_entity_path += L"/";
 				absolute_query_entity_path += relative_query_entity.path();
-				
+
+				// exclude the /tmp/* trees
+				if (absolute_query_entity_path.wstring().starts_with(L"/tmp")) {
+					LOG_INFO(s_logger, "Skip '{}' because the file is under the '/tmp/*' directory, in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
+					skipped++;
+					continue;
+				}
+
 				try {
 					auto file_size = ssh::sftp::filesystem::file_size(this->m_sftp_session.value(), absolute_query_entity_path);
 
