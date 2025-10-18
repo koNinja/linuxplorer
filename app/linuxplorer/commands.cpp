@@ -1,8 +1,12 @@
 #include "commands.hpp"
 
 #include <windows.h>
+#include <winternl.h>
 #include <Shlwapi.h>
 #include <TlHelp32.h>
+#include <winreg.h>
+#include <sddl.h>
+#include <shell/filesystem/cloud_provider_registrar.hpp>
 
 #include <ssh/ssh_address.hpp>
 #include <util/charset/case_insensitive_char_traits.hpp>
@@ -12,7 +16,7 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <string>
-#include <cctype>
+#include <cwctype>
 #include <algorithm>
 #include <optional>
 
@@ -20,12 +24,110 @@
 #define WSTRINGIFY(x)	TO_WSTRING(x)
 
 namespace linuxplorer::app::linuxplorer {
+	using unique_key_ptr = std::unique_ptr<std::remove_pointer_t<::HKEY>, decltype([](::HKEY ptr) -> void { ::RegCloseKey(ptr); })>;
+
+	template <class T>
+	using unique_hlocal_ptr = std::unique_ptr<T, decltype([](T* ptr) -> void { ::LocalFree(ptr); })>;
+
+	static std::optional<std::wstring> get_string_current_user_sid() noexcept {
+		::HANDLE token;
+		bool succeeded = ::OpenProcessToken(
+			::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, ::GetCurrentProcessId()),
+			TOKEN_QUERY,
+			&token
+		);
+		if (!succeeded) {
+			return std::nullopt;
+		}
+
+		::DWORD bytes_returned_token_user;
+		::GetTokenInformation(
+			token,
+			::TOKEN_INFORMATION_CLASS::TokenUser,
+			nullptr,
+			0,
+			&bytes_returned_token_user
+		);
+
+		unique_hlocal_ptr<::TOKEN_USER> token_user(static_cast<::TOKEN_USER*>(::LocalAlloc(LPTR, bytes_returned_token_user)));
+
+		succeeded = ::GetTokenInformation(
+			token,
+			::TOKEN_INFORMATION_CLASS::TokenUser,
+			token_user.get(),
+			bytes_returned_token_user,
+			&bytes_returned_token_user
+		);
+		if (!succeeded) {
+			::DWORD last_error = ::GetLastError();
+			return std::nullopt;
+		}
+
+		::LPWSTR nt_sid_str;
+		succeeded = ::ConvertSidToStringSidW(token_user->User.Sid, &nt_sid_str);
+		if (!succeeded) {
+			return std::nullopt;
+		}
+		unique_hlocal_ptr<wchar_t> sid_str(nt_sid_str);
+
+		return sid_str.get();
+	}
+
+	static ::LSTATUS open_key_in_hklm(unique_key_ptr& ptr, const std::wstring& relative_key_path) noexcept {
+		::LSTATUS rc;
+		::HKEY nt_key;
+		rc = ::RegCreateKeyExW(
+			HKEY_LOCAL_MACHINE,
+			relative_key_path.c_str(),
+			0,
+			nullptr,
+			REG_OPTION_NON_VOLATILE,
+			KEY_READ | KEY_WRITE | KEY_QUERY_VALUE | KEY_SET_VALUE,
+			nullptr,
+			&nt_key,
+			nullptr
+		);
+
+		ptr = unique_key_ptr(nt_key);
+		return rc;
+	}
+
+	static ::LSTATUS set_reg_value(const unique_key_ptr& ptr, const std::wstring& value_name, const std::wstring& value) noexcept {
+		return ::RegSetValueExW(
+			ptr.get(),
+			value_name.c_str(),
+			0,
+			REG_SZ,
+			reinterpret_cast<const ::BYTE*>(value.c_str()),
+			sizeof(wchar_t) * value.size()
+		);
+	}
+
+	static ::LSTATUS set_reg_value(const unique_key_ptr& ptr, const std::wstring& value_name, ::DWORD value) noexcept {
+		return ::RegSetValueExW(
+			ptr.get(),
+			value_name.c_str(),
+			0,
+			REG_DWORD,
+			reinterpret_cast<const ::BYTE*>(&value),
+			sizeof(::DWORD)
+		);
+	}
+
+	static ::LSTATUS delete_in_hklm(const std::wstring& relative_path) noexcept {
+		return ::RegDeleteTreeW(HKEY_LOCAL_MACHINE, relative_path.c_str());
+	}
+
+	constexpr const wchar_t* syncroot_key_prefix = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SyncRootManager";
+
 	int compare(std::wstring_view l, std::wstring_view r) {
-		return util::charset::case_insensitive_char_traits<basic_string_char_t<std::wstring_view>>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+		if (l.length() == r.length()) return util::charset::case_insensitive_char_traits<basic_string_char_t<std::wstring_view>>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+		else return 1;
 	}
 
 	int compare(std::string_view l, std::string_view r) {
-		return util::charset::case_insensitive_char_traits<basic_string_char_t<std::string_view>>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+		if (l.length() == r.length()) return util::charset::case_insensitive_char_traits<basic_string_char_t<std::string_view>>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+		else return 1;
 	}
 
 	int option_handler(int argc, char** argv) {
@@ -70,19 +172,17 @@ namespace linuxplorer::app::linuxplorer {
 			}
 			else {
 				const auto& param = options["config"].as<std::wstring>();
-				if (param == L"") {
-					std::wcerr << L"Error: Plase specify at least one setting." << std::endl;
-					return 1;
-				}
-				auto offset = param.find('@');
-				auto profile_name = offset != param.npos ? param.substr(0, offset) : L"";
+				auto name_value_offset = param.find('@') != param.npos ? param.find('@') + 1 : param.npos;
+				auto profile_name = name_value_offset != param.npos ? param.substr(0, name_value_offset - 1) : L"";
 
-				auto pos = param.find(L'=');
-				if (pos != param.npos) {
-					return commands::set_config_option(profile_name, param.substr(offset + 1, pos), param.substr(pos + 1));
+				auto value_offset = param.find(L'=') != param.npos ? param.find('=') + 1 : param.npos;
+				if (value_offset != param.npos) {
+					return commands::set_config_option(profile_name, param.substr(name_value_offset, value_offset - 1 - name_value_offset), param.substr(value_offset));
 				}
+				// no value
 				else {
-					return commands::get_config_option(profile_name, param.substr(offset + 1));
+					std::size_t name_offset = name_value_offset != param.npos ? name_value_offset /* specified with a profile */ : 0 /* specified a setting name only */ ;
+					return commands::get_config_option(profile_name, param.substr(name_offset));
 				}
 			}
 		}
@@ -186,11 +286,15 @@ namespace linuxplorer::app::linuxplorer {
 		}
 
 		int get_config_option(std::wstring_view profile_name, std::wstring_view name) {
-			if (compare(name, L"credential") == 0) {
+			if (name.empty()) {
+				std::wcerr << L"Error: Plase specify at least one setting." << std::endl;
+				return 1;
+			}
+			else if (compare(name, L"credential") == 0) {
 				try {
 					auto result = util::config::profile_manager::get(profile_name);
 
-					std::wcout << L"The credential is as follows below:" << std::endl <<
+					std::wcout << L"The credential is as follows:" << std::endl <<
 						L"\t" << L"Address: " << result.get_credential().get_host() << std::endl <<
 						L"\t" << L"Username: " << result.get_credential().get_username() << std::endl <<
 						L"\t" << L"Password: ";
@@ -212,7 +316,7 @@ namespace linuxplorer::app::linuxplorer {
 					auto result = util::config::profile_manager::get(profile_name);
 
 					std::wcout << L"The SFTP mount point is: \'" << result.get_syncroot() << L"\'." << std::endl;
-					
+
 					return 0;
 				}
 				catch (const util::config::config_exception& e) {
@@ -254,13 +358,14 @@ namespace linuxplorer::app::linuxplorer {
 
 		int set_config_option(std::wstring_view profile_name, std::wstring_view name, std::wstring_view value) {
 			std::wstring v(value);
-			v.erase(std::remove_if(v.begin(), v.end(), [](wchar_t c) -> bool { return std::isspace(c);}), v.end());
 
 			if (compare(name, L"credential") == 0) {
-				if (profile_name == L"") {
+				if (profile_name.empty()) {
 					std::wcerr << "Error: Please specify a profile." << std::endl;
 					return 1;
 				}
+
+				v.erase(std::remove_if(v.begin(), v.end(), [](wchar_t c) -> bool { return std::iswspace(c);}), v.end());
 
 				std::size_t pos = 0, prev_pos = 0;
 				int i = 0;
@@ -277,7 +382,7 @@ namespace linuxplorer::app::linuxplorer {
 							try {
 								ssh::ssh_address address(token);
 							}
-							catch (const std::invalid_argument& e) {
+							catch (const ssh::invalid_address_format_exception& e) {
 								std::wcerr << L"Error: Invalid address format: " << e.what() << std::endl;
 								return 1;
 							}
@@ -315,6 +420,10 @@ namespace linuxplorer::app::linuxplorer {
 				}
 			}
 			else if (compare(name, L"syncroot") == 0) {
+				if (profile_name.empty()) {
+					std::wcerr << "Error: Please specify a profile." << std::endl;
+					return 1;
+				}
 				try {
 					auto& result = util::config::profile_manager::get(profile_name);
 					if (!::PathFileExistsW(v.c_str())) {
@@ -322,19 +431,59 @@ namespace linuxplorer::app::linuxplorer {
 						return 1;
 					}
 
+					std::wstring old_syncroot(result.get_syncroot());
+
 					result.set_syncroot(v);
 					util::config::profile_manager::flush();
+
+					auto sid = get_string_current_user_sid();
+					if (!sid) {
+						std::wcerr << L"Failed to get the current user sid." << std::endl;
+						return 1;
+					}
+
+					std::wstring reg_path;
+					reg_path.append(syncroot_key_prefix).append(L"\\").append(WSTRINGIFY(LINUXPLORER_CLOUD_PROVIDER_NAME))
+						.append(L"!").append(*sid).append(L"!").append(profile_name).append(L"\\").append(L"UserSyncRoots");
+
+					unique_key_ptr key;
+					::LSTATUS rc = open_key_in_hklm(key, reg_path);
+					if (rc != ERROR_SUCCESS) {
+						std::error_code ec(rc, std::system_category());
+						std::wcerr << L"Failed to open the registry key 'HKEY_LOCAL_MACHINE\\" << reg_path << L"' (From Win32: " << ec.message().c_str() << L"(" << ec.value() << L"))" << std::endl;
+						return 1;
+					}
+
+					rc = set_reg_value(key, sid->c_str(), v);
+					if (rc != ERROR_SUCCESS) {
+						std::wcerr << L"Failed to set data of the registry value." << std::endl;
+						return 1;
+					}
+
+					try {
+						shell::filesystem::cloud_provider_registrar::unregister_provider(old_syncroot);
+					} catch (...) {}
+
+					shell::filesystem::cloud_provider_registrar::register_provider(v, WSTRINGIFY(LINUXPLORER_CLOUD_PROVIDER_NAME), WSTRINGIFY(LINUXPLORER_VERSION));
 				}
 				catch (const util::config::config_exception& e) {
 					std::wcerr << L"Configuration loading error: " << e.what() << std::endl;
 					return 1;
 				}
+				catch (const shell::cloud_provider_system_error& e) {
+					std::wcerr << L"Error: " << e.what() << L"(From Win32: " << e.code().message().c_str() << L"(" << e.code().value() << L"))" << std::endl;
+					return 1;
+				}
 			}
 			else if (compare(name, L"port") == 0) {
+				if (profile_name.empty()) {
+					std::wcerr << "Error: Please specify a profile." << std::endl;
+					return 1;
+				}
 				try {
 					auto& result = util::config::profile_manager::get(profile_name);
 
-					if (std::count_if(v.begin(), v.end(), [](wchar_t ch) { return std::isdigit(ch); })) {
+					if (std::count_if(v.begin(), v.end(), [](wchar_t ch) { return !std::iswdigit(ch); })) {
 						std::wcout << L"Error: Please specify numbers only." << std::endl;
 						return 1;
 					}
@@ -392,6 +541,15 @@ namespace linuxplorer::app::linuxplorer {
 
 		int initialize_config_option() {
 			try {
+				std::vector<std::wstring> profile_names;
+				for (const auto& profile : util::config::profile_manager::enumerate()) {
+					profile_names.push_back(std::wstring(profile.get_name()));
+				}
+
+				for (const auto& profile_name : profile_names) {
+					remove_profile_option(profile_name);
+				}
+
 				util::config::configuration_manager::initialize();
 			}
 			catch (const util::config::config_exception& e) {
@@ -521,13 +679,50 @@ namespace linuxplorer::app::linuxplorer {
 
 		int remove_profile_option(std::wstring_view profile_name) {
 			try {
+				auto profile = util::config::profile_manager::get(profile_name);
+				std::wstring old_syncroot(profile.get_syncroot());
+
 				util::config::profile_manager::remove(profile_name);
 				util::config::profile_manager::flush();
+
+				auto sid = get_string_current_user_sid();
+				if (!sid) {
+					std::wcerr << L"Failed to get the current user sid." << std::endl;
+					return 1;
+				}
+
+				std::wstring reg_path;
+				reg_path.append(syncroot_key_prefix).append(L"\\").append(WSTRINGIFY(LINUXPLORER_CLOUD_PROVIDER_NAME))
+						.append(L"!").append(*sid).append(L"!").append(profile_name);
+
+				unique_key_ptr key;
+				::LSTATUS rc = open_key_in_hklm(key, reg_path);
+				if (rc != ERROR_SUCCESS) {
+					std::error_code ec(rc, std::system_category());
+					std::wcerr << L"Failed to open the registry key 'HKEY_LOCAL_MACHINE\\" << reg_path << L"' (From Win32: " << ec.message().c_str() << L"(" << ec.value() << L"))" << std::endl;
+					return 1;
+				}
+
+				rc = delete_in_hklm(reg_path);
+				if (rc != ERROR_SUCCESS) {
+					std::error_code ec(rc, std::system_category());
+					std::wcerr << L"Failed to delete the registry key 'HKEY_LOCAL_MACHINE\\" << reg_path << L"' (From Win32: " << ec.message().c_str() << L"(" << ec.value() << L"))" << std::endl;
+					return 1;
+				}
+
+				try {
+					shell::filesystem::cloud_provider_registrar::unregister_provider(old_syncroot);
+				} catch (...) {}
+
 				std::wcout << L"The profile \'" << profile_name << L"\' has been unregistered successfully." << std::endl;
 				return 0;
 			}
 			catch (const util::config::config_exception& e) {
 				std::wcerr << L"Error: " << e.what() << std::endl;
+				return 1;
+			}
+			catch (const shell::cloud_provider_system_error& e) {
+				std::wcerr << L"Error: " << e.what() << L"(From Win32: " << e.code().message().c_str() << L"(" << e.code().value() << L"))" << std::endl;
 				return 1;
 			}
 		}
@@ -538,6 +733,39 @@ namespace linuxplorer::app::linuxplorer {
 				util::config::profile profile(profile_name, L"", 22, credential);
 				util::config::profile_manager::add(profile);
 				util::config::profile_manager::flush();
+				
+				auto sid = get_string_current_user_sid();
+				if (!sid) {
+					std::wcerr << L"Failed to get the current user sid." << std::endl;
+					return 1;
+				}
+
+				std::wstring reg_path;
+				reg_path.append(syncroot_key_prefix).append(L"\\").append(WSTRINGIFY(LINUXPLORER_CLOUD_PROVIDER_NAME))
+						.append(L"!").append(*sid).append(L"!").append(profile_name);
+
+				unique_key_ptr key;
+				::LSTATUS rc = open_key_in_hklm(key, reg_path);
+				if (rc != ERROR_SUCCESS) {
+					std::error_code ec(rc, std::system_category());
+					std::wcerr << L"Failed to open the registry key 'HKEY_LOCAL_MACHINE\\" << reg_path << L"' (From Win32: " << ec.message().c_str() << L"(" << ec.value() << L"))" << std::endl;
+					return 1;
+				}
+
+				bool failed_once = false;
+				rc = set_reg_value(key, L"DisplayNameResource", std::wstring(profile_name));
+				if (rc != ERROR_SUCCESS) failed_once = true;
+
+				constexpr ::DWORD flags_value = 0x422;
+				rc = set_reg_value(key, L"Flags", flags_value);
+				if (rc != ERROR_SUCCESS) failed_once = true;
+
+				rc = set_reg_value(key, L"IconResource", L"C:\\Windows\\system32\\shell.dll,-7");
+				if (rc != ERROR_SUCCESS || failed_once) {
+					std::wcerr << L"Failed to set data of registry values." << std::endl;
+					return 1;
+				}
+				
 				std::wcout << L"The profile \'" << profile_name << L"\' has been registered successfully." << std::endl;
 				return 0;
 			}
@@ -550,7 +778,7 @@ namespace linuxplorer::app::linuxplorer {
 		int enumerate_profile_option() {
 			try {
 				const auto& profiles = util::config::profile_manager::enumerate();
-				std::wcout << L"Registered profiles are as follows below:" << std::endl;
+				std::wcout << L"Registered profiles are as follows:" << std::endl;
 				for (const auto& profile : profiles) {
 					std::wcout << profile.get_name() << std::endl;
 				}

@@ -4,6 +4,7 @@
 #include "session.hpp"
 
 #include <fstream>
+#include <regex>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 
 #include <ssh/ssh_exception.hpp>
@@ -23,6 +24,20 @@
 #undef WIN32_NO_STATUS
 
 namespace linuxplorer::app::lxpsvc {
+	bool contains_invalid_ntfs_character(std::wstring_view path) {
+		static std::wregex invalid_pattern(LR"([<>:"/\\|?*])");
+
+		if (std::regex_search(path.cbegin(), path.cend(), invalid_pattern)) return true;
+
+		static std::wregex invalid_end_pattern(LR"([ \.]$)");
+		if (std::regex_search(path.cbegin(), path.cend(), invalid_end_pattern)) return true;
+
+		static std::wregex reserved_pattern(LR"(^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$)", std::regex_constants::icase);
+		if (std::regex_search(path.cbegin(), path.cend(), reserved_pattern)) return true;
+
+		return false;
+	}
+
 	void session::on_change_read(std::span<std::byte> bytes_notify_info) {
 		using chcvt = linuxplorer::util::charset::multibyte_wide_compat_helper;
 
@@ -427,11 +442,23 @@ namespace linuxplorer::app::lxpsvc {
 				auto placeholder_name_str = relative_query_entity.path().filename().wstring();
 				
 				if (placeholder_name_str == L"." || placeholder_name_str == L"..") continue;
+				if (contains_invalid_ntfs_character(placeholder_name_str)) {
+					LOG_INFO(s_logger, "Skip '{}' because its name contains invalid characters in NTFS, in session #{}.", relative_query_entity.path().filename().string(), this->m_session_id);
+					skipped++;
+					continue;
+				}
 				
 				std::filesystem::path absolute_query_entity_path = absolute_query_dir_path_str;
 				absolute_query_entity_path += L"/";
 				absolute_query_entity_path += relative_query_entity.path();
-				
+
+				// exclude the /tmp/* trees
+				if (absolute_query_entity_path.wstring().starts_with(L"/tmp")) {
+					LOG_INFO(s_logger, "Skip '{}' because the file is under the '/tmp/*' directory, in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
+					skipped++;
+					continue;
+				}
+
 				try {
 					auto file_size = ssh::sftp::filesystem::file_size(this->m_sftp_session.value(), absolute_query_entity_path);
 

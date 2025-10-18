@@ -21,7 +21,7 @@
 namespace linuxplorer::app::lxpsvc {
 	class session {
 	private:
-		inline static constexpr const wchar_t* s_provider_name = L"Linuxplorer";
+		inline static constexpr const wchar_t* s_provider_name = WSTRINGIFY(LINUXPLORER_CLOUD_PROVIDER_NAME);
 		inline static constexpr const wchar_t* s_provider_version = WSTRINGIFY(LINUXPLORER_VERSION);
 
 		inline static quill::Logger* s_logger = nullptr;

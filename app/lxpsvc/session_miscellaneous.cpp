@@ -13,6 +13,8 @@
 
 namespace linuxplorer::app::lxpsvc {
 	bool session::initialize_logger_if() noexcept {
+		using chcvt = util::charset::multibyte_wide_compat_helper;
+
 		if (s_logger) {
 			return false;
 		}
@@ -23,7 +25,7 @@ namespace linuxplorer::app::lxpsvc {
 			quill::Backend::start();
 
 			auto sink = quill::Frontend::create_or_get_sink<quill::FileSink>(
-				util::config::configuration_manager::get_log_path(),
+				chcvt::convert_wide_to_multibyte(util::config::configuration_manager::get_log_path()),
 				[]() {
 					quill::FileSinkConfig cfg;
 					cfg.set_open_mode('w');
