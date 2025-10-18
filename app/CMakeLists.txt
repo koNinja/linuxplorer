@@ -1,0 +1,4 @@
+set(LINUXPLORER_APP_SERVICE_TERMINATE_EVENT_NAME linuxplorer_app_service_terminate_event_name)
+set(LINUXPLORER_CLOUD_PROVIDER_NAME LinuxplorerCloudProvider)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/${LINUXPLORER_APP_MAIN_NAME})
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/${LINUXPLORER_APP_SERVICE_NAME})
