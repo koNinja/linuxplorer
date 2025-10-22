@@ -7,7 +7,7 @@
 #define STRINGIFY(x)	TO_STRING(x)
 
 namespace linuxplorer::util::config {
-	std::wstring configuration_manager::get_config_path() {
+	static std::wstring get_userprofile_path() {
 		constexpr std::size_t path_len = MAX_PATH;
 		wchar_t path[path_len];
 		auto rc = ::GetEnvironmentVariableW(L"USERPROFILE", path, path_len);
@@ -16,10 +16,18 @@ namespace linuxplorer::util::config {
 			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
 		}
 
-		std::wstring result = path;
-		result += L"\\.linuxplorer\\config.json";
+		return path;
+	}
+
+	std::wstring configuration_manager::get_root_path() {
+		std::wstring result = get_userprofile_path();
+		result += L"\\.linuxplorer";
 
 		return result;
+	}
+
+	std::wstring configuration_manager::get_config_path() {
+		return get_root_path() + L"\\config.json";
 	}
 
 	std::wstring configuration_manager::get_install_path() {
@@ -37,18 +45,7 @@ namespace linuxplorer::util::config {
 	}
 
 	std::wstring configuration_manager::get_log_path() {
-		constexpr std::size_t path_len = MAX_PATH;
-		wchar_t path[path_len];
-		auto rc = ::GetEnvironmentVariableW(L"USERPROFILE", path, path_len);
-		if (!rc) {
-			std::error_code ec(::GetLastError(), std::system_category());
-			throw config_system_error(ec, "Failed to get the environment variable: USERPROFILE");
-		}
-
-		std::wstring result = path;
-		result += L"\\.linuxplorer\\logs\\service.log";
-
-		return result;
+		return get_root_path() + L"\\logs\\service.log";
 	}
 
 	void configuration_manager::initialize() {

@@ -172,16 +172,21 @@ namespace linuxplorer::app::linuxplorer {
 			}
 			else {
 				const auto& param = options["config"].as<std::wstring>();
-				auto name_value_offset = param.find('@') != param.npos ? param.find('@') + 1 : param.npos;
+				auto name_value_offset = param.find('@');
+				if (name_value_offset != param.npos) name_value_offset++;
+
 				auto profile_name = name_value_offset != param.npos ? param.substr(0, name_value_offset - 1) : L"";
 
-				auto value_offset = param.find(L'=') != param.npos ? param.find('=') + 1 : param.npos;
+				auto value_offset = param.find(L'=');
+				if (value_offset != param.npos) value_offset++;
+
+				std::size_t name_offset = name_value_offset != param.npos ? name_value_offset /* specified with a profile */ : 0 /* specified a setting name only */ ;
+
 				if (value_offset != param.npos) {
-					return commands::set_config_option(profile_name, param.substr(name_value_offset, value_offset - 1 - name_value_offset), param.substr(value_offset));
+					return commands::set_config_option(profile_name, param.substr(name_offset, value_offset - 1 - name_offset), param.substr(value_offset));
 				}
 				// no value
 				else {
-					std::size_t name_offset = name_value_offset != param.npos ? name_value_offset /* specified with a profile */ : 0 /* specified a setting name only */ ;
 					return commands::get_config_option(profile_name, param.substr(name_offset));
 				}
 			}
@@ -541,13 +546,24 @@ namespace linuxplorer::app::linuxplorer {
 
 		int initialize_config_option() {
 			try {
-				std::vector<std::wstring> profile_names;
-				for (const auto& profile : util::config::profile_manager::enumerate()) {
-					profile_names.push_back(std::wstring(profile.get_name()));
+				using nt_unique_handle = std::unique_ptr<std::remove_pointer_t<::HANDLE>, decltype([](::HANDLE ptr) { ::CloseHandle(ptr); })>;
+
+				auto root_path = util::config::configuration_manager::get_root_path();
+				if (!::PathFileExistsW(root_path.c_str()) && !::CreateDirectoryW(root_path.c_str(), nullptr)) {
+					std::error_code ec(::GetLastError(), std::system_category());
+					std::wcerr << L"Error: Failed to create a directory '" << root_path << "' (From Win32: " << ec.message().c_str() << L" (" << ec.value() << L"))" << std::endl;
+					return 1;
 				}
 
-				for (const auto& profile_name : profile_names) {
-					remove_profile_option(profile_name);
+				if (::PathFileExistsW(util::config::configuration_manager::get_config_path().c_str())) {
+					std::vector<std::wstring> profile_names;
+					for (const auto& profile : util::config::profile_manager::enumerate()) {
+						profile_names.push_back(std::wstring(profile.get_name()));
+					}
+
+					for (const auto& profile_name : profile_names) {
+						remove_profile_option(profile_name);
+					}
 				}
 
 				util::config::configuration_manager::initialize();
