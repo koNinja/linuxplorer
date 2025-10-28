@@ -6,6 +6,7 @@
 #include <fstream>
 #include <regex>
 #include <util/charset/multibyte_wide_compat_helper.hpp>
+#include <util/charset/case_insensitive_char_traits.hpp>
 
 #include <ssh/ssh_exception.hpp>
 #include <ssh/ssh_address.hpp>
@@ -329,6 +330,11 @@ namespace linuxplorer::app::lxpsvc {
 		} while (bytes_notify_info_entry_diff > 0);
 	}
 
+	int compare(std::wstring_view l, std::wstring_view r) {
+		if (l.length() == r.length()) return util::charset::case_insensitive_char_traits<wchar_t>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+		else return 1;
+	}
+
 	shell::models::chunked_callback_generator<shell::functional::fetch_data_operation_info> session::on_fetch_data(const shell::functional::fetch_data_callback_parameters& parameters) {
 		using chcvt_helper = util::charset::multibyte_wide_compat_helper;
 
@@ -338,7 +344,7 @@ namespace linuxplorer::app::lxpsvc {
 
 		// Extract a relative path from the sync root directory
 		std::wstring relative_placeholder_path_str;
-		if (this->m_syncroot_dir != absolute_placeholder_path) {
+		if (compare(this->m_syncroot_dir, absolute_placeholder_path.wstring()) != 0) {
 			relative_placeholder_path_str = absolute_placeholder_path.wstring().substr(this->m_syncroot_dir.length() + 1);
 		}
 
@@ -423,7 +429,7 @@ namespace linuxplorer::app::lxpsvc {
 
 		// Extract a relative path from the sync root directory
 		std::wstring relative_placeholder_path_str;
-		if (this->m_syncroot_dir != absolute_placeholder_path) {
+		if (compare(this->m_syncroot_dir, absolute_placeholder_path.wstring()) != 0) {
 			relative_placeholder_path_str = absolute_placeholder_path.wstring().substr(this->m_syncroot_dir.length() + 1);
 		}
 

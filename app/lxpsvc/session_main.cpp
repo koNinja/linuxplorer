@@ -16,7 +16,7 @@ namespace linuxplorer::app::lxpsvc {
 	int session::main() {
 		unique_nthandle termination_event_handle, changes_detecion_event_handle;
 
-		termination_event_handle.reset(::CreateEventW(nullptr, false, false, WSTRINGIFY(LINUXPLORER_APP_SERVICE_TERMINATE_EVENT_NAME)));
+		termination_event_handle.reset(::CreateEventW(nullptr, true, false, WSTRINGIFY(LINUXPLORER_APP_SERVICE_TERMINATE_EVENT_NAME)));
 		if (!termination_event_handle) {
 			std::error_code ec(::GetLastError(), std::system_category());
 			LOG_CRITICAL(s_logger, "Failed to create a termination event in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());

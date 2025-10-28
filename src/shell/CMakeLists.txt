@@ -1,8 +1,8 @@
-add_library(shell SHARED)
-add_library(linuxplorer::shell ALIAS shell)
+add_library(linuxplorer.shell SHARED)
+add_library(linuxplorer::shell ALIAS linuxplorer.shell)
 set(LINUXPLORER_SHELL_DIR shell)
-target_compile_definitions(shell PRIVATE NOMINMAX LINUXPLORER_SHELL_API_IMPLEMENTATION)
-target_sources(shell 
+target_compile_definitions(linuxplorer.shell PRIVATE NOMINMAX LINUXPLORER_SHELL_API_IMPLEMENTATION)
+target_sources(linuxplorer.shell 
 	PRIVATE
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_session.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_provider_registrar.cpp
@@ -21,5 +21,5 @@ target_sources(shell
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_provider_registrar.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/placeholder_info.hpp
 )
-target_link_libraries(shell PRIVATE cldapi)
-install(TARGETS shell RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+target_link_libraries(linuxplorer.shell PRIVATE cldapi)
+install(TARGETS linuxplorer.shell RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -7,7 +7,7 @@
 #include <iosfwd>
 
 namespace linuxplorer::ssh::sftp::io {
-	constexpr std::streamsize sftpbuf_default_buffer_size = 0x1000;
+	constexpr std::streamsize sftpbuf_default_buffer_size = 65536;
 
 	class LINUXPLORER_SSH_API sftpbuf : public std::basic_streambuf<char> {
 		std::unique_ptr<char_type[]> m_inbuf;

@@ -36,7 +36,7 @@
 .cache
 .clangd
 cert.json
-
+libssh2-errno.csv
 
 # CMake outputs
 build
