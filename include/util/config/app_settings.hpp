@@ -84,9 +84,10 @@ namespace linuxplorer::util::config {
 
 		static void initialize();
 
+		static std::wstring get_root_path();
 		static std::wstring get_config_path();
-		static std::wstring get_install_path();
 		static std::wstring get_log_path();
+		static std::wstring get_install_path();
 	};
 
 	template <class T, class S>

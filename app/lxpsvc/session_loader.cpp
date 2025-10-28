@@ -21,11 +21,16 @@ namespace linuxplorer::app::lxpsvc {
 		try {
 			LOG_INFO(s_logger, "Starting session #{}.", this->m_session_id);
 
-			LOG_INFO(s_logger, "Loading configuration for session #{}.", this->m_session_id);
+			LOG_INFO(
+				s_logger,
+				"Loading the profile '{}' for session #{}.",
+				this->m_session_id, 
+				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(this->m_profile_name)
+			);
 			const auto& profile = util::config::profile_manager::get(this->m_profile_name);
 
 			this->m_ssh_session.emplace(ssh::ssh_address(profile.get_credential().get_host()), profile.get_port());
-			LOG_INFO(s_logger, "Configuration loaded successfully in session #{}.", this->m_session_id);
+			LOG_INFO(s_logger, "The configuration loaded successfully in session #{}.", this->m_session_id);
 
 
 			LOG_INFO(s_logger, "Connecting to SSH server in session #{}.", this->m_session_id);

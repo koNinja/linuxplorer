@@ -1,8 +1,8 @@
-add_library(ssh SHARED)
-add_library(linuxplorer::ssh ALIAS ssh)
+add_library(linuxplorer.ssh SHARED)
+add_library(linuxplorer::ssh ALIAS linuxplorer.ssh)
 set(LINUXPLORER_SHELL_DIR ssh)
-target_compile_definitions(ssh PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN LINUXPLORER_SSH_API_IMPLEMENTATION)
-target_sources(ssh 
+target_compile_definitions(linuxplorer.ssh PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN LINUXPLORER_SSH_API_IMPLEMENTATION)
+target_sources(linuxplorer.ssh 
 	PRIVATE
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/ssh_session.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/ssh_exception.cpp
@@ -25,5 +25,5 @@ target_sources(ssh
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/filesystem/sftp_entity.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/sftp/filesystem/sftp_manip.hpp
 )
-target_link_libraries(ssh PUBLIC libssh2::libssh2 linuxplorer::util::charset Boost::uuid ws2_32)
-install(TARGETS ssh RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+target_link_libraries(linuxplorer.ssh PUBLIC libssh2::libssh2 linuxplorer::util::charset Boost::uuid ws2_32)
+install(TARGETS linuxplorer.ssh RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
