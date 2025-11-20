@@ -5,16 +5,30 @@
 #include <ssh/ssh_session.hpp>
 #include <ssh/sftp/sftp_session.hpp>
 #include <filesystem>
-#include <memory>
+#include <vector>
 
 namespace linuxplorer::ssh::sftp::filesystem {
+	namespace internal {
+		LINUXPLORER_SSH_API std::filesystem::file_status status_flags_to_file_status(unsigned long status);
+	}
+	LINUXPLORER_SSH_API std::filesystem::file_time_type unix_to_filetime(std::uint64_t time);
+
 	class LINUXPLORER_SSH_API directory_entry {
 	private:
 		std::filesystem::path m_path;
-
+		std::uintmax_t m_file_size;
+		std::filesystem::file_status m_file_status;
+		std::filesystem::file_time_type m_last_access_time;
+		std::filesystem::file_time_type m_last_write_time;
 	public:
 		explicit directory_entry() = default;
-		explicit directory_entry(const std::filesystem::path& path);
+		explicit directory_entry(
+			const std::filesystem::path& path,
+			std::uintmax_t file_size,
+			const std::filesystem::file_status& status,
+			std::filesystem::file_time_type last_access_time,
+			std::filesystem::file_time_type last_write_time
+		);
 		directory_entry(const directory_entry& lhs) noexcept = default;
 		directory_entry(directory_entry&& rhs) noexcept = default;
 		
@@ -23,6 +37,11 @@ namespace linuxplorer::ssh::sftp::filesystem {
 
 		const std::filesystem::path& path() const noexcept;
 		operator const std::filesystem::path&() const noexcept;
+
+		std::uintmax_t file_size() const noexcept;
+		const std::filesystem::file_status& status() const noexcept;
+		std::filesystem::file_time_type last_write_time() const noexcept;
+		std::filesystem::file_time_type last_access_time() const noexcept;
 
 		virtual ~directory_entry() = default;
 	};
@@ -50,9 +69,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		virtual ~directory_iterator();
 	private:
 		std::streampos m_pos;
-		std::shared_ptr<value_type[]> m_ptr;
-
-		std::uint32_t m_count;
+		std::vector<value_type> m_entities;
 	};
 
 	inline directory_iterator begin(directory_iterator itr) noexcept {
