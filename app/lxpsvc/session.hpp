@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <mutex>
+#include <atomic>
 
 #include <ssh/ssh_address.hpp>
 #include <ssh/ssh_session.hpp>
@@ -57,6 +58,9 @@ namespace linuxplorer::app::lxpsvc {
 		void on_change_read(std::span<::std::byte> bytes_notify_info);
 		shell::models::chunked_callback_generator<shell::functional::fetch_data_operation_info> on_fetch_data(const shell::functional::fetch_data_callback_parameters& parameters);
 		shell::functional::fetch_placeholders_operation_info on_fetch_placeholders(const shell::functional::callback_parameters& parameters);
+		void on_cancel_fetch_data(const shell::functional::cancel_fetch_data_callback_parameters& parameters);
+
+		std::unordered_map<std::uint64_t, std::atomic<bool>> m_fetch_cancel_tokens;
 	public:
 		session(std::wstring_view profile_name) noexcept;
 		session(const session& lhs) = delete;
