@@ -202,7 +202,7 @@ namespace linuxplorer::app::lxpsvc {
 						);
 					}
 					/*
-						When 'Always keep on this device' is selected in context menu of directory, the system only sets a pinned attribute to the placeholder recursively,
+						When 'Always keep on this device' is selected in context menu, the system only sets a pinned attribute to the placeholder recursively,
 						so the app should monitor placeholder's attribute changes and respond them.
 					*/
 					// if 'always keep on this device' is selected:
@@ -214,7 +214,7 @@ namespace linuxplorer::app::lxpsvc {
 					{
 						auto lock = std::unique_lock(this->m_sftp_mutex);
 
-						std::ifstream ifs(absolute_src_path);
+						std::ifstream ifs(absolute_src_path, std::ios::binary);
 						ssh::sftp::io::osftpstream oss(m_sftp_session.value(), dest_path_str, std::ios_base::trunc | std::ios_base::out);
 
 						::LARGE_INTEGER file_size;
@@ -225,19 +225,22 @@ namespace linuxplorer::app::lxpsvc {
 						}
 
 						constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
-						std::streamsize remaining_bytes = file_size.QuadPart;
+						auto buffer = std::make_unique<std::byte[]>(unit_chunk_length);
+						std::streamsize bytes_remaining = file_size.QuadPart;
 						std::streamsize bytes_read = 0;
 						do {
-							std::size_t buffer_size = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_bytes));
-							auto buffer = std::make_unique<std::byte[]>(buffer_size);
+							std::size_t buffer_size = std::min(unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
+
 							ifs.read(reinterpret_cast<char*>(buffer.get()), buffer_size);
 							bytes_read = ifs.gcount();
-							remaining_bytes -= bytes_read;
+
 							oss.write(reinterpret_cast<char*>(buffer.get()), bytes_read);
-						} while (bytes_read > 0 && remaining_bytes > 0);
 
+							bytes_remaining -= bytes_read;
+						} while (bytes_read > 0 && bytes_remaining > 0);
+						
 						oss.flush();
-
+						
 						placeholder.set_marked_in_sync(true);
 						placeholder.flush();
 
@@ -272,7 +275,7 @@ namespace linuxplorer::app::lxpsvc {
 				);
 				continue;
 			}
-			catch (const std::system_error& e) {
+			catch (const shell::cloud_provider_system_error& e) {
 				LOG_ERROR(
 					s_logger,
 					"Failed a placeholder operation in session #{}: {} (From Win32: {}({}))",
@@ -292,7 +295,7 @@ namespace linuxplorer::app::lxpsvc {
 				if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) ssh::sftp::filesystem::create_directory(this->m_sftp_session.value(), dest_path_str);
 				else ssh::sftp::filesystem::create(this->m_sftp_session.value(), dest_path_str, ssh::sftp::filesystem::open_permissions::read);
 
-				basic_placeholder.set_marked_in_sync(true);
+				basic_placeholder.set_marked_in_sync(false);
 				basic_placeholder.flush();
 
 				LOG_INFO(
@@ -339,6 +342,8 @@ namespace linuxplorer::app::lxpsvc {
 		using chcvt_helper = util::charset::multibyte_wide_compat_helper;
 
 		LOG_INFO(s_logger, "Data fetch requested by the system in session #{}.", this->m_session_id);
+		
+		this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart].store(false);
 
 		std::filesystem::path absolute_placeholder_path = parameters.get_absolute_placeholder_path();
 
@@ -356,43 +361,47 @@ namespace linuxplorer::app::lxpsvc {
 		std::unique_lock lock(this->m_sftp_mutex);
 		try {
 			ssh::sftp::io::isftpstream iss(this->m_sftp_session.value(), absolute_query_path_str, std::ios_base::in);
-			constexpr std::size_t unit_chunk_length = 2097152;	// 2MiB
-			std::size_t current_offset = parameters.get_offset();
-			std::streamsize remaining_length = parameters.get_length();
-			std::streamsize current_length = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_length));
-			std::streamsize current_read_length = 0;
+			constexpr std::size_t unit_chunk_length = 2097152;	// 2 MiB
+			std::streamsize bytes_remaining = parameters.get_length();
+			std::size_t bytes_offset = parameters.get_offset();
+			std::streamsize bytes_has_read = 0;
 			do {
-				std::vector<std::byte> data(current_length);
+				if (this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart].load()) co_return;
+				
+				std::streamsize bytes_to_read = std::min(unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
+				std::vector<std::byte> data(bytes_to_read);
 
 				LOG_INFO(
 					s_logger,
 					"Downloading for '{}', offset: {} bytes, at least length: {} bytes, in session #{}",
 					chcvt_helper::convert_wide_to_multibyte(absolute_query_path_str),
-					current_offset,
-					current_length,
+					bytes_offset,
+					bytes_to_read,
 					this->m_session_id
 				);
 
-				iss.seekg(current_offset);
-				iss.read(reinterpret_cast<char*>(data.data()), current_length);
-				current_read_length = iss.gcount();
+				iss.read(reinterpret_cast<char*>(data.data()), bytes_to_read);
+				bytes_has_read = iss.gcount();
 				
 				shell::functional::fetch_data_operation_info result;
 				result.set_buffer(std::move(data));
-				result.set_length(current_read_length);
-				result.set_offset(current_offset);
+				result.set_length(bytes_has_read);
+				result.set_offset(bytes_offset);
 				
 				co_yield std::move(result);
 				
-				remaining_length -= current_read_length;
-				current_offset += current_read_length;
-				current_length = std::min(unit_chunk_length, static_cast<std::size_t>(remaining_length));
+				bytes_remaining -= bytes_has_read;
+				bytes_offset += bytes_has_read;
 			}
-			while (current_read_length > 0 && remaining_length > 0);
+			while (bytes_has_read > 0 && bytes_remaining > 0);
+
+			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
 
 			co_return;
 		}
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
+			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+
 			LOG_CRITICAL(
 				s_logger,
 				"Failed to read file data via isftpstream in session #{}: {} (libssh2: {}({}))",
@@ -404,6 +413,8 @@ namespace linuxplorer::app::lxpsvc {
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
+			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+
 			LOG_CRITICAL(
 				s_logger,
 				"Failed to SSH operations in session #{}: {} (libssh2: {}({}))",
@@ -415,6 +426,8 @@ namespace linuxplorer::app::lxpsvc {
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (...) {
+			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+
 			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
@@ -466,14 +479,12 @@ namespace linuxplorer::app::lxpsvc {
 				}
 
 				try {
-					auto file_size = ssh::sftp::filesystem::file_size(this->m_sftp_session.value(), absolute_query_entity_path);
-
 					shell::filesystem::file_times file_times;
-					file_times.set_last_write_time(ssh::sftp::filesystem::last_write_time(this->m_sftp_session.value(), absolute_query_entity_path));
-					file_times.set_last_access_time(ssh::sftp::filesystem::last_access_time(this->m_sftp_session.value(), absolute_query_entity_path));
-					
+					file_times.set_last_write_time(relative_query_entity.last_write_time());
+					file_times.set_last_access_time(relative_query_entity.last_access_time());
+
 					std::uint32_t file_attributes;
-					switch (ssh::sftp::filesystem::status(this->m_sftp_session.value(), absolute_query_entity_path).type()) {
+					switch (relative_query_entity.status().type()) {
 						case std::filesystem::file_type::directory:
 							file_attributes = FILE_ATTRIBUTE_DIRECTORY;
 							break;
@@ -486,16 +497,9 @@ namespace linuxplorer::app::lxpsvc {
 							continue;
 					}
 
-					shell::filesystem::placeholder_creation_info info(
-						placeholder_name_str,
-						file_size,
-						file_attributes,
-						file_times
-					);
-
 					result.add_creation_info(shell::filesystem::placeholder_creation_info(
 						placeholder_name_str,
-						file_size,
+						relative_query_entity.file_size(),
 						file_attributes,
 						file_times
 					));
@@ -524,5 +528,10 @@ namespace linuxplorer::app::lxpsvc {
 		LOG_INFO(s_logger, "{} placeholders will be created, and {} will be skipped, in session #{}.", placeholder_count, skipped, this->m_session_id);
 
 		return result;
+	}
+
+	void session::on_cancel_fetch_data(const shell::functional::cancel_fetch_data_callback_parameters& parameters) {
+		if (this->m_fetch_cancel_tokens.contains(parameters.get_native_info().FileId.QuadPart))
+			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart].store(true);
 	}
 }

@@ -393,7 +393,7 @@ namespace linuxplorer::shell::filesystem {
 
 	void directory_placeholder::internal_secondary_flush() const {
 		::CF_UPDATE_FLAGS flags = ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_NONE;
-		flags |= this->m_enumeration_enabled ? ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_ENABLE_ON_DEMAND_POPULATION : ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_ENABLE_ON_DEMAND_POPULATION;
+		flags |= this->m_enumeration_enabled ? ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_ENABLE_ON_DEMAND_POPULATION : ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_DISABLE_ON_DEMAND_POPULATION;
 
 		::HRESULT hr = ::CfUpdatePlaceholder(
 		this->get_handle(),

@@ -49,10 +49,12 @@ namespace linuxplorer::app::lxpsvc {
 		// For details: https://learn.microsoft.com/ja-jp/windows/win32/api/winnt/ns-winnt-file_notify_information
 		constexpr ::DWORD supported_file_changes_at_once = 1000;	// by default
 		constexpr ::DWORD notify_info_total_size_bytes = 532 * supported_file_changes_at_once;
-		std::byte bytes_notify_info[notify_info_total_size_bytes];
+
 		while (true) {
 			constexpr ::DWORD notify_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_SIZE | 
-				FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_ATTRIBUTES;
+			FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_ATTRIBUTES;
+			
+			auto bytes_notify_info = std::make_unique<std::byte[]>(notify_info_total_size_bytes);
 
 			::ResetEvent(changes_detecion_event_handle.get());
 
@@ -62,7 +64,7 @@ namespace linuxplorer::app::lxpsvc {
 			overlapped.hEvent = changes_detecion_event_handle.get();
 			bool succeeded = ::ReadDirectoryChangesW(
 				directory_handle.get(),
-				bytes_notify_info,
+				bytes_notify_info.get(),
 				notify_info_total_size_bytes * sizeof(std::byte),
 				true,
 				notify_filter,
@@ -114,7 +116,7 @@ namespace linuxplorer::app::lxpsvc {
 
 				if (bytes_notify_info_returned <= 0) continue;
 
-				this->on_change_read(std::span(bytes_notify_info, notify_info_total_size_bytes));
+				this->on_change_read(std::span(bytes_notify_info.get(), notify_info_total_size_bytes));
 
 				break;
 			}
