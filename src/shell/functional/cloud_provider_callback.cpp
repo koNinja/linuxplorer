@@ -96,7 +96,7 @@ namespace linuxplorer::shell::functional {
 			operation_parameters.TransferPlaceholders.PlaceholderCount = placeholder_count;
 			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
 
-			auto nt_placeholder_creation_info = std::make_unique<::CF_PLACEHOLDER_CREATE_INFO[]>(placeholder_count);
+			auto nt_placeholder_creation_info = placeholder_count > 0 ? std::make_unique<::CF_PLACEHOLDER_CREATE_INFO[]>(placeholder_count) : nullptr;
 			for (std::size_t i = 0; i < placeholder_count; i++) {
 				nt_placeholder_creation_info[i].Flags = ::CF_PLACEHOLDER_CREATE_FLAGS::CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC;
 				nt_placeholder_creation_info[i].RelativeFileName = result.get_creation_info()[i].get_relative_path().data();

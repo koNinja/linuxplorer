@@ -94,7 +94,6 @@ namespace linuxplorer::app::lxpsvc {
 					s_logger,
 					"Failed to remove the file '{}' corresponding to the deleted file from the server in session #{}: {} (libssh2: {}({}))",
 					chcvt::convert_wide_to_multibyte(dest_path_str),
-					chcvt::convert_wide_to_multibyte(absolute_src_path),
 					this->m_session_id,
 					e.what(),
 					e.code().message(),
@@ -295,7 +294,7 @@ namespace linuxplorer::app::lxpsvc {
 				if (basic_placeholder.get_type() == shell::filesystem::placeholder_type::directory) ssh::sftp::filesystem::create_directory(this->m_sftp_session.value(), dest_path_str);
 				else ssh::sftp::filesystem::create(this->m_sftp_session.value(), dest_path_str, ssh::sftp::filesystem::open_permissions::read);
 
-				basic_placeholder.set_marked_in_sync(false);
+				basic_placeholder.set_marked_in_sync(true);
 				basic_placeholder.flush();
 
 				LOG_INFO(
