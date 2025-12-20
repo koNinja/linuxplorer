@@ -159,6 +159,21 @@ namespace linuxplorer::app::linuxplorer {
 			return 1;
 		}
 
+		auto root_path = util::config::configuration_manager::get_root_path();
+		if (!::PathFileExistsW(root_path.c_str())) {
+			::CreateDirectoryW(root_path.c_str(), nullptr);
+			::CloseHandle(::CreateFileW(
+				util::config::configuration_manager::get_config_path().c_str(),
+				GENERIC_READ | GENERIC_WRITE,
+				0,
+				nullptr,
+				CREATE_NEW,
+				FILE_ATTRIBUTE_NORMAL,
+				nullptr
+			));
+			util::config::configuration_manager::initialize();
+		}
+
 		if (options.count("version")) {
 			std::wcout << L"linuxplorer version: " << WSTRINGIFY(LINUXPLORER_VERSION) << std::endl;
 			return 0;
