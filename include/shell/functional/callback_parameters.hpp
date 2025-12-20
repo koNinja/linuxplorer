@@ -66,6 +66,53 @@ namespace linuxplorer::shell::functional {
 		std::size_t get_length() const noexcept;
 	};
 
+	class LINUXPLORER_SHELL_API rename_callback_parameters : public callback_parameters {
+	private:
+		std::wstring m_new_path;
+	public:
+		rename_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters);
+		rename_callback_parameters(const rename_callback_parameters& lhs) = default;
+		rename_callback_parameters(rename_callback_parameters&& rhs) = default;
+		virtual ~rename_callback_parameters() = default;
+
+		rename_callback_parameters& operator=(const rename_callback_parameters& lhs) = default;
+		rename_callback_parameters& operator=(rename_callback_parameters&& rhs) = default;
+
+		std::wstring_view get_new_path() const noexcept;
+	};
+
+	class LINUXPLORER_SHELL_API rename_completion_callback_parameters : public callback_parameters {
+	private:
+		std::wstring m_old_path;
+	public:
+		rename_completion_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters);
+		rename_completion_callback_parameters(const rename_completion_callback_parameters& lhs) = default;
+		rename_completion_callback_parameters(rename_completion_callback_parameters&& rhs) = default;
+		virtual ~rename_completion_callback_parameters() = default;
+
+		rename_completion_callback_parameters& operator=(const rename_completion_callback_parameters& lhs) = default;
+		rename_completion_callback_parameters& operator=(rename_completion_callback_parameters&& rhs) = default;
+
+		std::wstring_view get_old_path() const noexcept;
+	};
+
+	class LINUXPLORER_SHELL_API delete_callback_parameters : public callback_parameters {
+	private:
+		bool m_has_deleted;
+		bool m_is_directory;
+	public:
+		delete_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters);
+		delete_callback_parameters(const delete_callback_parameters& lhs) = default;
+		delete_callback_parameters(delete_callback_parameters&& rhs) = default;
+		virtual ~delete_callback_parameters() = default;
+
+		delete_callback_parameters& operator=(const delete_callback_parameters& lhs) = default;
+		delete_callback_parameters& operator=(delete_callback_parameters&& rhs) = default;
+
+		bool has_deleted() const noexcept;
+		bool is_directory() const noexcept;
+	};
+
 	class operation_info {};
 
 	class LINUXPLORER_SHELL_API fetch_data_operation_info : public operation_info {

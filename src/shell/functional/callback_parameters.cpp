@@ -43,6 +43,37 @@ namespace linuxplorer::shell::functional {
 		return this->m_length;
 	}
 
+	rename_callback_parameters::rename_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters) : callback_parameters(info, parameters), m_new_path(parameters->Rename.TargetPath)
+	{}
+
+	std::wstring_view rename_callback_parameters::get_new_path() const noexcept {
+		return this->m_new_path;
+	}
+
+	rename_completion_callback_parameters::rename_completion_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters) : callback_parameters(info, parameters)
+	{
+		if (parameters->RenameCompletion.SourcePath) {
+			this->m_old_path = parameters->RenameCompletion.SourcePath;
+		}
+	}
+
+	std::wstring_view rename_completion_callback_parameters::get_old_path() const noexcept {
+		return this->m_old_path;
+	}
+
+	delete_callback_parameters::delete_callback_parameters(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters) : callback_parameters(info, parameters), 
+		m_has_deleted(!(parameters->Delete.Flags & ::CF_CALLBACK_DELETE_FLAGS::CF_CALLBACK_DELETE_FLAG_IS_UNDELETE)),
+		m_is_directory(parameters->Delete.Flags & ::CF_CALLBACK_DELETE_FLAGS::CF_CALLBACK_DELETE_FLAG_IS_DIRECTORY)
+	{}
+
+	bool delete_callback_parameters::has_deleted() const noexcept {
+		return this->m_has_deleted;
+	}
+
+	bool delete_callback_parameters::is_directory() const noexcept {
+		return this->m_is_directory;
+	}
+
 	std::size_t fetch_data_operation_info::get_offset() const noexcept {
 		return this->m_offset;
 	}

@@ -24,8 +24,12 @@ namespace linuxplorer::shell::filesystem {
 		this->fetch();
 	}
 
-	cloud_filter_placeholder::cloud_filter_placeholder(cloud_filter_placeholder&& rhs) : m_id(rhs.m_id), m_absolute_path(std::move(rhs.m_absolute_path)), 
-		m_handle(rhs.m_handle), m_type(placeholder_type::file), m_in_sync_marked(rhs.m_in_sync_marked)
+	cloud_filter_placeholder::cloud_filter_placeholder(cloud_filter_placeholder&& rhs) : 
+		m_id(rhs.m_id),
+		m_absolute_path(std::move(rhs.m_absolute_path)),
+		m_handle(rhs.m_handle), m_type(placeholder_type::file),
+		m_in_sync_marked(rhs.m_in_sync_marked),
+		m_pin_state(rhs.m_pin_state)
 	{
 		rhs.m_handle = INVALID_HANDLE_VALUE;
 	}
@@ -288,7 +292,7 @@ namespace linuxplorer::shell::filesystem {
 	file_placeholder::file_placeholder(file_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {}
 
 	file_placeholder::file_placeholder(cloud_filter_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {
-		this->fetch();
+		this->internal_secondary_fetch();
 	}
 
 	file_placeholder::~file_placeholder() {}
@@ -388,7 +392,7 @@ namespace linuxplorer::shell::filesystem {
 	directory_placeholder::directory_placeholder(directory_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)), m_enumeration_enabled(rhs.m_enumeration_enabled) {}
 
 	directory_placeholder::directory_placeholder(cloud_filter_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {
-		this->fetch();
+		this->internal_secondary_fetch();
 	}
 
 	void directory_placeholder::internal_secondary_flush() const {

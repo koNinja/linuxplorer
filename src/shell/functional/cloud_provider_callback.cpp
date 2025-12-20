@@ -169,7 +169,102 @@ namespace linuxplorer::shell::functional {
 		catch (...) {}
 	}
 
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		::CF_OPERATION_INFO operation_info;
+		::ZeroMemory(&operation_info, sizeof(::CF_OPERATION_INFO));
+		operation_info.StructSize = sizeof(::CF_OPERATION_INFO);
+		operation_info.ConnectionKey = info->ConnectionKey;
+		operation_info.TransferKey = info->TransferKey;
+		operation_info.Type = ::CF_OPERATION_TYPE::CF_OPERATION_TYPE_ACK_RENAME;
+		operation_info.CorrelationVector = info->CorrelationVector;
+		operation_info.RequestKey = info->RequestKey;
+		operation_info.SyncStatus = nullptr;
+
+		::CF_OPERATION_PARAMETERS operation_parameters;
+		::ZeroMemory(&operation_parameters, sizeof(::CF_OPERATION_PARAMETERS));
+		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, AckRename) + sizeof(::CF_OPERATION_PARAMETERS::AckRename);
+		operation_parameters.AckRename.Flags = ::CF_OPERATION_ACK_RENAME_FLAGS::CF_OPERATION_ACK_RENAME_FLAG_NONE;
+
+		try {
+			this->m_callback(rename_callback_parameters(info, parameters));
+			operation_parameters.AckRename.CompletionStatus = STATUS_SUCCESS;
+		}
+		catch (const callback_abort_exception& e) {
+			operation_parameters.AckRename.CompletionStatus = e.code();
+		}
+		catch (...) {
+			operation_parameters.AckRename.CompletionStatus = STATUS_UNSUCCESSFUL;
+		}
+
+		::CfExecute(&operation_info, &operation_parameters);
+	}
+
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		try {
+			this->m_callback(rename_completion_callback_parameters(info, parameters));
+		}
+		// ignore all
+		catch (...) {}
+	}
+
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		::CF_OPERATION_INFO operation_info;
+		::ZeroMemory(&operation_info, sizeof(::CF_OPERATION_INFO));
+		operation_info.StructSize = sizeof(::CF_OPERATION_INFO);
+		operation_info.ConnectionKey = info->ConnectionKey;
+		operation_info.TransferKey = info->TransferKey;
+		operation_info.Type = ::CF_OPERATION_TYPE::CF_OPERATION_TYPE_ACK_DELETE;
+		operation_info.CorrelationVector = info->CorrelationVector;
+		operation_info.RequestKey = info->RequestKey;
+		operation_info.SyncStatus = nullptr;
+
+		::CF_OPERATION_PARAMETERS operation_parameters;
+		::ZeroMemory(&operation_parameters, sizeof(::CF_OPERATION_PARAMETERS));
+		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, AckDelete) + sizeof(::CF_OPERATION_PARAMETERS::AckDelete);
+		operation_parameters.AckDelete.Flags = ::CF_OPERATION_ACK_DELETE_FLAGS::CF_OPERATION_ACK_DELETE_FLAG_NONE;
+		try {
+			this->m_callback(delete_callback_parameters(info, parameters));
+			operation_parameters.AckDelete.CompletionStatus = STATUS_SUCCESS;
+		}
+		catch (const callback_abort_exception& e) {
+			operation_parameters.AckDelete.CompletionStatus = e.code();
+		}
+		catch (...) {
+			operation_parameters.AckDelete.CompletionStatus = STATUS_UNSUCCESSFUL;
+		}
+
+		::CfExecute(&operation_info, &operation_parameters);
+	}
+
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion_completion>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		try {
+			this->m_callback(rename_completion_callback_parameters(info, parameters));
+		}
+		// ignore all
+		catch (...) {}
+	}
+
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
     template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion_completion>;
 }
