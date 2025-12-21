@@ -167,6 +167,50 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		}
 	}
 
+	std::uintmax_t internal_remove_children_recursive(const sftp_session& session, const std::filesystem::path& path) {
+		std::uintmax_t count = 0;
+		std::vector<sftp::filesystem::directory_entry> entries;
+		for (const auto& entry : directory_iterator(session, path)) {
+			if (entry.path() == L"." || entry.path() == L"..") continue;
+			entries.push_back(entry);
+		}
+
+		for (const auto& entry : entries) {
+			auto entry_path = path;
+			entry_path.concat(L"/").concat(entry.path().wstring());
+
+			if (entry.status().type() == std::filesystem::file_type::directory) {
+				count += internal_remove_children_recursive(session, entry_path);
+				remove(session, entry_path);
+				count++;
+			}
+			else if (entry.status().type() == std::filesystem::file_type::regular) {
+				remove(session, entry_path);
+				count++;
+			}
+			else {
+				throw ssh_libssh2_sftp_exception(
+					std::error_code(static_cast<int>(std::errc::not_supported), std::generic_category()),
+					"Not supported file type encountered during recursive removal."
+				);
+			}
+		}
+
+		return count;
+	}
+
+	std::uintmax_t remove_all(const sftp_session& session, const std::filesystem::path& path) {
+		if (sftp::filesystem::status(session, path).type() == std::filesystem::file_type::directory) {
+			auto count = internal_remove_children_recursive(session, path);
+			sftp::filesystem::remove(session, path);
+			return ++count;
+		}
+		else {
+			sftp::filesystem::remove(session, path);
+			return 1;
+		}
+	}
+
 	std::filesystem::file_time_type last_write_time(const sftp_session& session, const std::filesystem::path& path) {
 		auto p = path.u8string();
 

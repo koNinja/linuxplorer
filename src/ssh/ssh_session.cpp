@@ -38,7 +38,7 @@ namespace linuxplorer::ssh {
 			}
 		}
 		if (!internal::ssh_library_resource_manager::is_libssh2_initiated()) {
-			int errc = internal::ssh_library_resource_manager::is_libssh2_initiated();
+			int errc = internal::ssh_library_resource_manager::try_initiate_libssh2();
 			if (errc != 0) {
 				throw ssh_libssh2_exception(std::error_code(errc, libssh2_category(*this)), "Failed to initiate use of the libssh2 by the process.");
 			}

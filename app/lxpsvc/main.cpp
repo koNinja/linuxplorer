@@ -1,4 +1,5 @@
 #include "session.hpp"
+#include <util/config/profiles.hpp>
 
 namespace {
 	int thread_main(std::wstring_view profile_name) {

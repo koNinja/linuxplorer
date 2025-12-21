@@ -91,7 +91,6 @@ namespace linuxplorer::shell::functional {
 		try {
 			auto result = this->m_callback(callback_parameters(info, parameters));
 			operation_parameters.TransferPlaceholders.CompletionStatus = STATUS_SUCCESS;
-			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
 			size_t placeholder_count = result.get_count_to_be_processed();
 			operation_parameters.TransferPlaceholders.PlaceholderCount = placeholder_count;
 			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
@@ -100,8 +99,8 @@ namespace linuxplorer::shell::functional {
 			for (std::size_t i = 0; i < placeholder_count; i++) {
 				nt_placeholder_creation_info[i].Flags = ::CF_PLACEHOLDER_CREATE_FLAGS::CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC;
 				nt_placeholder_creation_info[i].RelativeFileName = result.get_creation_info()[i].get_relative_path().data();
-				nt_placeholder_creation_info[i].FileIdentity = result.get_creation_info()[i].get_relative_path().data();
-				nt_placeholder_creation_info[i].FileIdentityLength = (result.get_creation_info()[i].get_relative_path().size()) * sizeof(wchar_t);
+				nt_placeholder_creation_info[i].FileIdentity = result.get_creation_info()[i].get_identity().data();
+				nt_placeholder_creation_info[i].FileIdentityLength = result.get_creation_info()[i].get_identity().size() * sizeof(std::byte);
 
 				::CF_FS_METADATA metadata;
 				::ZeroMemory(&metadata, sizeof(::CF_FS_METADATA));
@@ -235,8 +234,8 @@ namespace linuxplorer::shell::functional {
 		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, AckDelete) + sizeof(::CF_OPERATION_PARAMETERS::AckDelete);
 		operation_parameters.AckDelete.Flags = ::CF_OPERATION_ACK_DELETE_FLAGS::CF_OPERATION_ACK_DELETE_FLAG_NONE;
 		try {
-			this->m_callback(delete_callback_parameters(info, parameters));
-			operation_parameters.AckDelete.CompletionStatus = STATUS_SUCCESS;
+			auto result = this->m_callback(delete_callback_parameters(info, parameters));
+			operation_parameters.AckDelete.CompletionStatus = result.get_status();
 		}
 		catch (const callback_abort_exception& e) {
 			operation_parameters.AckDelete.CompletionStatus = e.code();

@@ -5,6 +5,7 @@
 #include <shell/cloud_provider_exception.hpp>
 #include <shell/cloud_provider_session_token.hpp>
 #include <shell/functional/callback_parameters.hpp>
+#include <shell/functional/callback_operation_info.hpp>
 #include <shell/models/chunked_callback_generator.hpp>
 
 #define DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(Type, Return, Parameter)	\
@@ -21,14 +22,14 @@ namespace linuxplorer::shell::functional {
 		cancel_fetching_data = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_CANCEL_FETCH_DATA,
 		fetch_placeholders = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_FETCH_PLACEHOLDERS,
 		cancel_fetching_placeholders = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_CANCEL_FETCH_PLACEHOLDERS,		// not implemented yet
-		notify_file_open_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_FILE_OPEN_COMPLETION,		// unused
-		notify_file_close_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_FILE_CLOSE_COMPLETION,	// unused
-		notify_dehydration = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE,							// unused
-		notify_dehydration_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE_COMPLETION,	// unused
-		notify_deletion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DELETE,								// unused
-		notify_deletion_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DELETE_COMPLETION,			// unused
-		notify_renaming = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_RENAME,								// unused
-		notify_renaming_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_RENAME_COMPLETION			// unused
+		notify_file_open_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_FILE_OPEN_COMPLETION,		// not implemented yet
+		notify_file_close_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_FILE_CLOSE_COMPLETION,	// not implemented yet
+		notify_dehydration = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE,							// not implemented yet
+		notify_dehydration_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE_COMPLETION,	// not implemented yet
+		notify_deletion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DELETE,
+		notify_deletion_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DELETE_COMPLETION,
+		notify_renaming = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_RENAME,
+		notify_renaming_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_RENAME_COMPLETION
 	};
 
 	class callback_duplication_exception : public cloud_provider_runtime_exception {
@@ -56,7 +57,7 @@ namespace linuxplorer::shell::functional {
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::cancel_fetching_data, void, cancel_fetch_data_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming, operation_info, rename_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming_completion, void, rename_completion_callback_parameters);
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion, operation_info, delete_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion, delete_operation_info, delete_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion_completion, void, callback_parameters);
 	}
 

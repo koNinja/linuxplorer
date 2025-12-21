@@ -53,6 +53,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 	//LINUXPLORER_SSH_API void permissions(const sftp_handle& handle, std::filesystem::perms perms, std::filesystem::perm_options opts = std::filesystem::perm_options::replace);
 	LINUXPLORER_SSH_API void rename(const sftp_session& session, const std::filesystem::path& old_path, const std::filesystem::path& new_path);
 	LINUXPLORER_SSH_API void remove(const sftp_session& session, const std::filesystem::path& path);
+	LINUXPLORER_SSH_API std::uintmax_t remove_all(const sftp_session& session, const std::filesystem::path& path);
 	LINUXPLORER_SSH_API std::filesystem::file_time_type last_write_time(const sftp_session& session, const std::filesystem::path& path);
 	LINUXPLORER_SSH_API std::filesystem::file_time_type last_access_time(const sftp_session& session, const std::filesystem::path& path);
 }
