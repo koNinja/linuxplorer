@@ -161,16 +161,6 @@ namespace linuxplorer::app::linuxplorer {
 
 		auto root_path = util::config::configuration_manager::get_root_path();
 		if (!::PathFileExistsW(root_path.c_str())) {
-			::CreateDirectoryW(root_path.c_str(), nullptr);
-			::CloseHandle(::CreateFileW(
-				util::config::configuration_manager::get_config_path().c_str(),
-				GENERIC_READ | GENERIC_WRITE,
-				0,
-				nullptr,
-				CREATE_NEW,
-				FILE_ATTRIBUTE_NORMAL,
-				nullptr
-			));
 			util::config::configuration_manager::initialize();
 		}
 
@@ -787,7 +777,7 @@ namespace linuxplorer::app::linuxplorer {
 				rc = set_reg_value(key, L"DisplayNameResource", std::wstring(profile_name));
 				if (rc != ERROR_SUCCESS) failed_once = true;
 
-				constexpr ::DWORD flags_value = 0x422;
+				constexpr ::DWORD flags_value = 0x22;
 				rc = set_reg_value(key, L"Flags", flags_value);
 				if (rc != ERROR_SUCCESS) failed_once = true;
 
