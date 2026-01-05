@@ -225,7 +225,7 @@ namespace linuxplorer::app::lxpsvc {
 				return;
 			}
 
-			std::span<const std::byte> identity(reinterpret_cast<const std::byte*>(relative_client_path.data()), relative_client_path.length() * sizeof(wchar_t));
+			std::span<const std::byte> identity(s_dummy_blob, s_dummy_blob_length);
 			auto placeholder = shell::filesystem::cloud_filter_placeholder::transform(this->m_cloud_session.value(), relative_client_path, identity);
 
 			if (placeholder.get_type() == shell::filesystem::placeholder_type::directory) {
@@ -387,29 +387,65 @@ namespace linuxplorer::app::lxpsvc {
 			std::ifstream ifs(absolute_src_path, std::ios::binary);
 			ssh::sftp::io::osftpstream oss(m_sftp_session.value(), server_path, std::ios_base::trunc | std::ios_base::out);
 
-			::LARGE_INTEGER file_size;
-			bool succeeded = ::GetFileSizeEx(placeholder.get_handle(), &file_size);
-			if (!succeeded) {
-				LOG_CRITICAL(s_logger, "Failed to get file size of '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
-				return;
+			constexpr std::size_t ranges_count = 256;
+			::CF_FILE_RANGE fragmented_modified_ranges[ranges_count];
+			::DWORD bytes_read_ranges;
+			::HRESULT hr = ::CfGetPlaceholderRangeInfo(
+				placeholder.get_handle(),
+				::CF_PLACEHOLDER_RANGE_INFO_CLASS::CF_PLACEHOLDER_RANGE_INFO_MODIFIED,
+				::LARGE_INTEGER { .QuadPart = 0 },
+				::LARGE_INTEGER { .QuadPart = CF_EOF },
+				fragmented_modified_ranges,
+				sizeof(::CF_FILE_RANGE) * ranges_count,
+				&bytes_read_ranges
+			);
+
+			std::size_t valid_range_count = bytes_read_ranges / sizeof(::CF_FILE_RANGE);
+			if (FAILED(hr)) {
+				LOG_WARNING(s_logger, "Failed to get data ranges of data that is not currently synchronized with the server, in session #{}", this->m_session_id);
+
+				::LARGE_INTEGER file_size;
+				if (!::GetFileSizeEx(placeholder.get_handle(), &file_size)) {
+					LOG_ERROR(s_logger, "Failed to get file size of '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+					return;
+				}
+
+				// Transfer all the data to the server
+				valid_range_count = 1;
+				fragmented_modified_ranges[0].StartingOffset.QuadPart = 0;
+				fragmented_modified_ranges[0].Length.QuadPart = file_size.QuadPart;
 			}
 
 			constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
 			auto buffer = std::make_unique<std::byte[]>(unit_chunk_length);
-			std::streamsize bytes_remaining = file_size.QuadPart;
-			std::streamsize bytes_read = 0;
-			do {
-				std::size_t buffer_size = std::min(unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
-
-				ifs.read(reinterpret_cast<char*>(buffer.get()), buffer_size);
-				bytes_read = ifs.gcount();
-
-				oss.write(reinterpret_cast<char*>(buffer.get()), bytes_read);
-
-				bytes_remaining -= bytes_read;
-			} while (bytes_read > 0 && bytes_remaining > 0);
 			
-			oss.flush();
+			for (int i = 0; i < valid_range_count; i++) {
+				LOG_INFO(
+					s_logger,
+					"Uploading for '{}', offset: {} bytes, at least length: {} bytes, in session #{}",
+					chcvt::convert_wide_to_multibyte(server_path),
+					fragmented_modified_ranges[i].StartingOffset.QuadPart,
+					fragmented_modified_ranges[i].Length.QuadPart,
+					this->m_session_id
+				);
+
+				ifs.seekg(fragmented_modified_ranges[i].StartingOffset.QuadPart);
+				oss.seekp(fragmented_modified_ranges[i].StartingOffset.QuadPart);
+				std::streamsize bytes_remaining = fragmented_modified_ranges->Length.QuadPart;
+				std::streamsize bytes_read = 0;
+				do {
+					std::size_t buffer_size = std::min(unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
+
+					ifs.read(reinterpret_cast<char*>(buffer.get()), buffer_size);
+					bytes_read = ifs.gcount();
+
+					oss.write(reinterpret_cast<char*>(buffer.get()), bytes_read);
+
+					bytes_remaining -= bytes_read;
+				} while (bytes_read > 0 && bytes_remaining > 0);
+				
+				oss.flush();
+			}
 			
 			placeholder.set_marked_in_sync(true);
 			placeholder.flush();

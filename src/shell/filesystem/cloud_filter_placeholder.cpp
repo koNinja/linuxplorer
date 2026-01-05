@@ -16,7 +16,8 @@ namespace linuxplorer::shell::filesystem {
 		m_absolute_path(std::move(rhs.m_absolute_path)),
 		m_handle(rhs.m_handle), m_type(placeholder_type::file),
 		m_in_sync_marked(rhs.m_in_sync_marked),
-		m_pin_state(rhs.m_pin_state)
+		m_pin_state(rhs.m_pin_state),
+		m_identity(std::move(rhs.m_identity))
 	{
 		rhs.m_handle = INVALID_HANDLE_VALUE;
 	}
@@ -154,25 +155,41 @@ namespace linuxplorer::shell::filesystem {
 	void cloud_filter_placeholder::internal_primary_fetch() {
 		::HRESULT hr;
 
-		::CF_PLACEHOLDER_STANDARD_INFO placeholder_info;
+		auto placeholder_info = std::make_unique<::CF_PLACEHOLDER_STANDARD_INFO>();
 		hr = ::CfGetPlaceholderInfo(
 			this->m_handle,
 			::CF_PLACEHOLDER_INFO_CLASS::CF_PLACEHOLDER_INFO_STANDARD,
-			&placeholder_info,
+			placeholder_info.get(),
 			sizeof(::CF_PLACEHOLDER_STANDARD_INFO),
 			nullptr
 		);
-		if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA)) {
+		
+		if (hr == HRESULT_FROM_WIN32(ERROR_MORE_DATA)) {
+			std::size_t bytes_placeholder_info = sizeof(CF_PLACEHOLDER_STANDARD_INFO) + placeholder_info->FileIdentityLength;
+			placeholder_info.reset(reinterpret_cast<::CF_PLACEHOLDER_STANDARD_INFO*>(new std::byte[bytes_placeholder_info]));
+			hr = ::CfGetPlaceholderInfo(
+				this->m_handle,
+				::CF_PLACEHOLDER_INFO_CLASS::CF_PLACEHOLDER_INFO_STANDARD,
+				placeholder_info.get(),
+				bytes_placeholder_info,
+				nullptr
+			);
+		}
+		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
 			throw cloud_provider_system_error(ec, "Failed to get placeholder information.");
 		}
 
 		std::uint32_t attr = ::GetFileAttributesW(this->m_absolute_path.c_str());
 
-		this->m_id = placeholder_info.FileId.QuadPart;
-		this->m_in_sync_marked = placeholder_info.InSyncState;
+		this->m_id = placeholder_info->FileId.QuadPart;
+		this->m_in_sync_marked = placeholder_info->InSyncState;
 		this->m_type = attr & FILE_ATTRIBUTE_DIRECTORY ? placeholder_type::directory : placeholder_type::file;
-		this->m_pin_state = placeholder_info.PinState;
+		this->m_pin_state = placeholder_info->PinState;
+		this->m_identity = std::vector<std::byte>(
+			reinterpret_cast<std::byte*>(placeholder_info->FileIdentity),
+			reinterpret_cast<std::byte*>(placeholder_info->FileIdentity + placeholder_info->FileIdentityLength)
+		);
 	}
 
 	void cloud_filter_placeholder::internal_primary_flush() const {
@@ -182,8 +199,8 @@ namespace linuxplorer::shell::filesystem {
 		::HRESULT hr = ::CfUpdatePlaceholder(
 		this->m_handle,
 		nullptr,
-		nullptr,
-		0,
+		this->m_identity.data(),
+		this->m_identity.size() * sizeof(std::byte),
 		nullptr,
 		0,
 		flags,
@@ -241,6 +258,14 @@ namespace linuxplorer::shell::filesystem {
 	}
 	void cloud_filter_placeholder::set_pin_state(::CF_PIN_STATE state) noexcept {
 		this->m_pin_state = state;
+	}
+
+	const std::vector<std::byte>& cloud_filter_placeholder::get_identity() const noexcept {
+		return this->m_identity;
+	}
+
+	void cloud_filter_placeholder::set_identity(const std::vector<std::byte>& identity) noexcept {
+		this->m_identity = identity;
 	}
 
 	void cloud_filter_placeholder::close_handle() {

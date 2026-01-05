@@ -160,54 +160,38 @@ namespace linuxplorer::app::lxpsvc {
 				}
 				
 				std::filesystem::path absolute_query_entity_path = absolute_query_dir_path_str;
-				absolute_query_entity_path += L"/";
+				if (absolute_query_dir_path_str != L"/") absolute_query_entity_path += L"/";
 				absolute_query_entity_path += relative_query_entity.path();
 
-				// exclude the /tmp/* trees
-				if (absolute_query_entity_path.wstring().starts_with(L"/tmp")) {
-					LOG_INFO(s_logger, "Skip '{}' because the file is under the '/tmp/*' directory, in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
-					skipped++;
-					continue;
+				shell::filesystem::file_times file_times;
+				file_times.set_last_write_time(relative_query_entity.last_write_time());
+				file_times.set_last_access_time(relative_query_entity.last_access_time());
+
+				std::uint32_t file_attributes;
+				switch (relative_query_entity.status().type()) {
+					case std::filesystem::file_type::directory:
+						file_attributes = FILE_ATTRIBUTE_DIRECTORY;
+						break;
+					case std::filesystem::file_type::regular:
+						file_attributes = FILE_ATTRIBUTE_NORMAL;
+						break;
+					default:
+						LOG_INFO(s_logger, "Skip '{}' due to unknown file type, in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
+						skipped++;
+						continue;
 				}
 
-				try {
-					shell::filesystem::file_times file_times;
-					file_times.set_last_write_time(relative_query_entity.last_write_time());
-					file_times.set_last_access_time(relative_query_entity.last_access_time());
+				shell::filesystem::placeholder_creation_info info(
+					placeholder_name_str,
+					relative_query_entity.file_size(),
+					file_attributes,
+					file_times
+				);
 
-					std::uint32_t file_attributes;
-					switch (relative_query_entity.status().type()) {
-						case std::filesystem::file_type::directory:
-							file_attributes = FILE_ATTRIBUTE_DIRECTORY;
-							break;
-						case std::filesystem::file_type::regular:
-							file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE;
-							break;
-						default:
-							LOG_INFO(s_logger, "Skip '{}' due to unknown file type, in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
-							skipped++;
-							continue;
-					}
+				auto absolute_query_entity_path_str = absolute_query_entity_path.wstring();
+				info.set_identity(std::vector<std::byte>(s_dummy_blob, s_dummy_blob + s_dummy_blob_length));
 
-					shell::filesystem::placeholder_creation_info info(
-						placeholder_name_str,
-						relative_query_entity.file_size(),
-						file_attributes,
-						file_times
-					);
-
-					info.set_identity(std::vector<std::byte>(
-						reinterpret_cast<const std::byte*>(absolute_query_entity_path.wstring().data()),
-						reinterpret_cast<const std::byte*>(absolute_query_entity_path.wstring().data() + absolute_query_entity_path.wstring().size())
-					));
-
-					result.add_creation_info(std::move(info));
-				}
-				catch (const ssh::ssh_libssh2_sftp_exception& e) {
-					LOG_INFO(s_logger, "Failed to get file information and skip '{}', in session #{}.", absolute_query_entity_path.string(), this->m_session_id);
-					skipped++;
-					continue;
-				}
+				result.add_creation_info(std::move(info));
 			}
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {

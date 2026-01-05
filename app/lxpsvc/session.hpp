@@ -67,6 +67,9 @@ namespace linuxplorer::app::lxpsvc {
 		using usn_record_t = ::USN_RECORD_V3;
 
 		inline static constexpr std::chrono::seconds s_refetch_period = std::chrono::seconds(300);
+
+		inline static constexpr std::size_t s_dummy_blob_length = 1;
+		inline static constexpr std::byte s_dummy_blob[s_dummy_blob_length] = {};
 	private:
 		using chcvt = util::charset::multibyte_wide_compat_helper;
 

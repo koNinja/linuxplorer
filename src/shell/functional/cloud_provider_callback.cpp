@@ -102,19 +102,18 @@ namespace linuxplorer::shell::functional {
 				nt_placeholder_creation_info[i].FileIdentity = result.get_creation_info()[i].get_identity().data();
 				nt_placeholder_creation_info[i].FileIdentityLength = result.get_creation_info()[i].get_identity().size() * sizeof(std::byte);
 
-				::CF_FS_METADATA metadata;
-				::ZeroMemory(&metadata, sizeof(::CF_FS_METADATA));
-				metadata.FileSize.QuadPart = result.get_creation_info()[i].get_file_size();
-				metadata.BasicInfo.FileAttributes = result.get_creation_info()[i].get_file_attributes();
+				::ZeroMemory(&nt_placeholder_creation_info[i].FsMetadata, sizeof(::CF_FS_METADATA));
+				nt_placeholder_creation_info[i].FsMetadata.FileSize.QuadPart = result.get_creation_info()[i].get_file_size();
+				if (result.get_creation_info()[i].get_file_attributes() & FILE_ATTRIBUTE_DIRECTORY)
+					nt_placeholder_creation_info[i].FsMetadata.FileSize.QuadPart = 0;
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.FileAttributes = result.get_creation_info()[i].get_file_attributes();
 				
 				// The epoch time in MSVC STD's std::filesystem::file_time_type and Windows FILETIME are the same.
 				auto file_times = result.get_creation_info()[i].get_file_times();
-				metadata.BasicInfo.CreationTime.QuadPart = file_times.get_creation_time().time_since_epoch().count();
-				metadata.BasicInfo.LastAccessTime.QuadPart = file_times.get_last_access_time().time_since_epoch().count();
-				metadata.BasicInfo.LastWriteTime.QuadPart = file_times.get_last_write_time().time_since_epoch().count();
-				metadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
-
-				nt_placeholder_creation_info[i].FsMetadata = std::move(metadata);
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.CreationTime.QuadPart = file_times.get_creation_time().time_since_epoch().count();
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.LastAccessTime.QuadPart = file_times.get_last_access_time().time_since_epoch().count();
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.LastWriteTime.QuadPart = file_times.get_last_write_time().time_since_epoch().count();
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
 			}
 			operation_parameters.TransferPlaceholders.PlaceholderArray = nt_placeholder_creation_info.get();
 

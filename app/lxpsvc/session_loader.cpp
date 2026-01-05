@@ -13,7 +13,6 @@
 #include <shell/filesystem/cloud_provider_registrar.hpp>
 
 #include <util/config/profiles.hpp>
-#include <util/config/placeholder_cache.hpp>
 
 #include <quill/LogMacros.h>
 

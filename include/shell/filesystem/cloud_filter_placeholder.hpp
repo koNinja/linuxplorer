@@ -24,6 +24,8 @@ namespace linuxplorer::shell::filesystem {
 		std::uint64_t m_id;
 		::CF_IN_SYNC_STATE m_in_sync_marked;
 		::CF_PIN_STATE m_pin_state;
+
+		std::vector<std::byte> m_identity;
 	protected:
 		virtual void internal_secondary_fetch();
 		virtual void internal_secondary_flush() const;
@@ -53,6 +55,9 @@ namespace linuxplorer::shell::filesystem {
 		void set_marked_in_sync(bool synchronized) noexcept;
 		::CF_PIN_STATE get_pin_state() const noexcept;
 		void set_pin_state(::CF_PIN_STATE state) noexcept;
+
+		const std::vector<std::byte>& get_identity() const noexcept;
+		void set_identity(const std::vector<std::byte>& identity) noexcept;
 	};
 
 	class LINUXPLORER_SHELL_API file_placeholder : public cloud_filter_placeholder {
