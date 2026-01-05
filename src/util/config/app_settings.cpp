@@ -1,4 +1,5 @@
 #include <util/config/app_settings.hpp>
+#include <filesystem>
 #include <system_error>
 #include <windows.h>
 #include <Shlwapi.h>
@@ -30,6 +31,10 @@ namespace linuxplorer::util::config {
 		return get_root_path() + L"\\config.json";
 	}
 
+	std::wstring configuration_manager::get_cache_root() {
+		return get_root_path() + L"\\cache";
+	}
+
 	std::wstring configuration_manager::get_install_path() {
 		constexpr std::size_t path_len = MAX_PATH;
 		wchar_t module_file_path[path_len];
@@ -50,16 +55,24 @@ namespace linuxplorer::util::config {
 
 	void configuration_manager::initialize() {
 		try {
+			std::filesystem::create_directories(get_root_path());
+			std::filesystem::create_directories(get_cache_root());
+
 			std::ofstream ofs;
 			ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 			ofs.open(get_config_path());
-			
 			ofs << "{}" << std::endl;
 			ofs.flush();
+			ofs.close();
 		}
 		catch (const std::ios_base::failure& e) {
 			std::stringstream error;
-			error << "File stream failed: " << e.code().message();
+			error << "File stream failed: " << e.what() << " (" << e.code().message() << "(" << e.code().value() << "))";
+			throw config_io_exception(error.str());
+		}
+		catch (const std::filesystem::filesystem_error& e) {
+			std::stringstream error;
+			error << "File system operation failed: " << e.what() << " (" << e.code().message() << "(" << e.code().value() << "))";
 			throw config_io_exception(error.str());
 		}
 	}

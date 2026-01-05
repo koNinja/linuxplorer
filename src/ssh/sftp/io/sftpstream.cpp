@@ -64,8 +64,7 @@ namespace linuxplorer::ssh::sftp::io {
 			return sftpbuf::traits_type::eof();
 		}
 
-		::libssh2_sftp_seek64(this->m_handle.get_handle(), this->m_in_seek);
-		auto bytes_read = libssh2_sftp_read(this->m_handle.get_handle(), this->m_inbuf.get(), this->m_inbufsize);
+		auto bytes_read = ::libssh2_sftp_read(this->m_handle.get_handle(), this->m_inbuf.get(), this->m_inbufsize);
 		if (bytes_read < 0) {
 			throw ssh_libssh2_sftp_exception(std::error_code(bytes_read, libssh2_sftp_category()), "Failed to read data.");
 		}
@@ -107,45 +106,37 @@ namespace linuxplorer::ssh::sftp::io {
 			return sftpbuf::traits_type::eof();
 		}
 
-		::libssh2_sftp_seek64(this->m_handle.get_handle(), this->m_out_seek);
-		
-		auto bytes_written = ::libssh2_sftp_write(this->m_handle.get_handle(), this->m_outbuf.get(), this->pptr() - this->pbase());
-		if (bytes_written < 0) {
-			throw ssh_libssh2_exception(std::error_code(bytes_written, libssh2_sftp_category()), "Failed to write data.");
-		}
-		
-		this->m_out_seek += bytes_written;
-		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
-		
-		sftpbuf::int_type result = sftpbuf::traits_type::not_eof(ch);
-		if (!sftpbuf::traits_type::eq_int_type(ch, sftpbuf::traits_type::eof())) {
-			sftpbuf::char_type c = sftpbuf::traits_type::to_char_type(ch);
-
-			auto bytes_append = ::libssh2_sftp_write(this->m_handle.get_handle(), &c, 1);
-			if (bytes_append < 0) {
-				throw ssh_libssh2_exception(std::error_code(bytes_append, libssh2_sftp_category()), "Failed to append the parameter data.");
+		std::streamsize total_bytes_written = 0;
+		std::streamsize bytes_written = 0;
+		std::streamsize bytes_to_write = this->pptr() - this->pbase();
+		do {
+			bytes_written = ::libssh2_sftp_write(this->m_handle.get_handle(), this->m_outbuf.get() + total_bytes_written, bytes_to_write);
+			if (bytes_written < 0) {
+				throw ssh_libssh2_exception(std::error_code(bytes_written, libssh2_sftp_category()), "Failed to write data.");
 			}
 
-			this->m_out_seek += 1;
-
-			result = sftpbuf::traits_type::to_int_type(ch);
+			bytes_to_write -= bytes_written;
+			total_bytes_written += bytes_written;
+		} while (bytes_written > 0 && bytes_to_write > 0);
+		
+		this->m_out_seek += total_bytes_written;
+		this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
+		
+		if (!sftpbuf::traits_type::eq_int_type(ch, sftpbuf::traits_type::eof())) {
+			sftpbuf::char_type c = sftpbuf::traits_type::to_char_type(ch);
+			*this->pptr() = c;
+			this->pbump(1);
+			return sftpbuf::traits_type::to_int_type(ch);
 		}
 
-		return result;
+		return sftpbuf::traits_type::not_eof(ch);
 	}
-	
 
 	int sftpbuf::sync() {
-		sftpbuf::int_type o = 0, u = 0;
-		
-		if (this->m_inbuf) {
-			u = this->underflow();
+		if (this->m_outbuf && this->overflow() == traits_type::eof()) {
+			return -1;
 		}
-		if (this->m_outbuf) {
-			o = this->overflow();
-		}
-
-		return -(sftpbuf::traits_type::eq_int_type(o, sftpbuf::traits_type::eof()) || sftpbuf::traits_type::eq_int_type(o, sftpbuf::traits_type::eof()));
+		return 0;
 	}
 
 	sftpbuf::pos_type sftpbuf::seekoff(sftpbuf::off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
@@ -168,33 +159,44 @@ namespace linuxplorer::ssh::sftp::io {
 		case std::ios_base::end:
 		{
 			::LIBSSH2_SFTP_ATTRIBUTES attr;
-			int rc = libssh2_sftp_fstat(this->m_handle.get_handle(), &attr);
+			int rc = ::libssh2_sftp_fstat_ex(this->m_handle.get_handle(), &attr, 0);
 			if (rc < 0) {
 				throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get attributes on an SFTP file handle.");
 			}
 			
-			if (which & std::ios_base::in) abs_in_pos = attr.filesize - off;
-			if (which & std::ios_base::out) abs_out_pos = attr.filesize - off;
+			if (which & std::ios_base::in) abs_in_pos = attr.filesize + off;
+			if (which & std::ios_base::out) abs_out_pos = attr.filesize + off;
 			break;
 		}
 		default:
 			throw std::invalid_argument("Invalid seeking direction type.");
 		}
 
-		if (which & std::ios_base::in) this->seekpos(abs_in_pos, std::ios_base::in);
-		if (which & std::ios_base::out) this->seekpos(abs_out_pos, std::ios_base::out);
-
-		return abs_in_pos + abs_out_pos;
+		if (which & std::ios_base::in) {
+			this->seekpos(abs_in_pos, std::ios_base::in);
+			return abs_in_pos;
+		}
+		else if (which & std::ios_base::out) {
+			this->seekpos(abs_out_pos, std::ios_base::out);
+			return abs_out_pos;
+		}
+		else {
+			return 0;
+		}
 	}
 
 	sftpbuf::pos_type sftpbuf::seekpos(sftpbuf::pos_type pos, std::ios_base::openmode which) {
 		if (which & std::ios_base::in) {
 			this->m_in_seek = pos;
+			this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get() + this->m_inbufsize);
 		}
 
 		if (which & std::ios_base::out) {
 			this->m_out_seek = pos;
+			this->setp(this->m_outbuf.get(), this->m_outbuf.get(), this->m_outbuf.get() + this->m_outbufsize);
 		}
+
+		::libssh2_sftp_seek64(this->m_handle.get_handle(), pos);
 
 		return pos;
 	}
@@ -263,7 +265,7 @@ namespace linuxplorer::ssh::sftp::io {
 		}
 
 		this->m_buffer = std::make_unique<sftpbuf>(session,  std::move(sftp_handle(session, handle)), std::ios_base::out, sftpbuf_default_buffer_size);
-		
+
 		if (mode & std::ios_base::app) {
 			this->m_buffer->pubseekoff(0, std::ios_base::end, std::ios_base::out);
 		}

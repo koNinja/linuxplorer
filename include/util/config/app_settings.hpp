@@ -9,18 +9,22 @@
 
 namespace linuxplorer::util::config {
 	class LINUXPLORER_CONFIG_API configuration_manager {
+	private:
+		inline static std::optional<nlohmann::json> s_config_json;
 	public:
 		configuration_manager() = delete;
 
 		template <class T>
 		static T get_value(std::string_view name) {
 			try {
-				std::ifstream ifs;
-				ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-				ifs.open(get_config_path());
+				if (!s_config_json) {
+					std::ifstream ifs;
+					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+					ifs.open(get_config_path());
+					s_config_json = nlohmann::json::parse(ifs);
+				}
 
-				auto json = nlohmann::json::parse(ifs);
-				return json[name].get<T>();
+				return (*s_config_json)[name].get<T>();
 			}
 			catch (const std::ios_base::failure& e) {
 				std::stringstream error;
@@ -37,14 +41,16 @@ namespace linuxplorer::util::config {
 		template <class T>
 		static void set_value(std::string_view name, const T& value) {
 			try {
-				std::ifstream ifs;
-				ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-				ifs.open(get_config_path());
+				if (!s_config_json) {
+					std::ifstream ifs;
+					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+					ifs.open(get_config_path());
+					s_config_json = nlohmann::json::parse(ifs);
+				}
 
-				auto json = nlohmann::json::parse(ifs);
-				json[name] = value;
+				(*s_config_json)[name] = value;
 
-				auto text = json.dump(4);
+				auto text = s_config_json->dump(4);
 
 				std::ofstream ofs(get_config_path());
 				ofs << text << std::endl;
@@ -63,12 +69,14 @@ namespace linuxplorer::util::config {
 
 		static bool has_value(std::string_view name) {
 			try {
-				std::ifstream ifs;
-				ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-				ifs.open(get_config_path());
+				if (!s_config_json) {
+					std::ifstream ifs;
+					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+					ifs.open(get_config_path());
+					s_config_json = nlohmann::json::parse(ifs);
+				}
 
-				auto json = nlohmann::json::parse(ifs);
-				return json.contains(name);
+				return s_config_json->contains(name);
 			}
 			catch (const std::ios_base::failure& e) {
 				std::stringstream error;
@@ -86,6 +94,7 @@ namespace linuxplorer::util::config {
 
 		static std::wstring get_root_path();
 		static std::wstring get_config_path();
+		static std::wstring get_cache_root();
 		static std::wstring get_log_path();
 		static std::wstring get_install_path();
 	};

@@ -7,13 +7,14 @@ target_sources(linuxplorer.shell
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_session.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_provider_registrar.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/cloud_filter_placeholder.cpp
-	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/filesystem/placeholder_info.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/functional/cloud_provider_callback.cpp
 	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/functional/callback_parameters.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_SHELL_DIR}/functional/callback_operation_info.cpp
 	PUBLIC
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/shellfwd.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/functional/cloud_provider_callback.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/functional/callback_parameters.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/functional/callback_operation_info.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/models/chunked_callback_generator.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_session.hpp
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_SHELL_DIR}/cloud_provider_exception.hpp

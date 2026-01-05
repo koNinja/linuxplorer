@@ -91,31 +91,29 @@ namespace linuxplorer::shell::functional {
 		try {
 			auto result = this->m_callback(callback_parameters(info, parameters));
 			operation_parameters.TransferPlaceholders.CompletionStatus = STATUS_SUCCESS;
-			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
 			size_t placeholder_count = result.get_count_to_be_processed();
 			operation_parameters.TransferPlaceholders.PlaceholderCount = placeholder_count;
 			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
 
-			auto nt_placeholder_creation_info = std::make_unique<::CF_PLACEHOLDER_CREATE_INFO[]>(placeholder_count);
+			auto nt_placeholder_creation_info = placeholder_count > 0 ? std::make_unique<::CF_PLACEHOLDER_CREATE_INFO[]>(placeholder_count) : nullptr;
 			for (std::size_t i = 0; i < placeholder_count; i++) {
 				nt_placeholder_creation_info[i].Flags = ::CF_PLACEHOLDER_CREATE_FLAGS::CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC;
 				nt_placeholder_creation_info[i].RelativeFileName = result.get_creation_info()[i].get_relative_path().data();
-				nt_placeholder_creation_info[i].FileIdentity = result.get_creation_info()[i].get_relative_path().data();
-				nt_placeholder_creation_info[i].FileIdentityLength = (result.get_creation_info()[i].get_relative_path().size()) * sizeof(wchar_t);
+				nt_placeholder_creation_info[i].FileIdentity = result.get_creation_info()[i].get_identity().data();
+				nt_placeholder_creation_info[i].FileIdentityLength = result.get_creation_info()[i].get_identity().size() * sizeof(std::byte);
 
-				::CF_FS_METADATA metadata;
-				::ZeroMemory(&metadata, sizeof(::CF_FS_METADATA));
-				metadata.FileSize.QuadPart = result.get_creation_info()[i].get_file_size();
-				metadata.BasicInfo.FileAttributes = result.get_creation_info()[i].get_file_attributes();
+				::ZeroMemory(&nt_placeholder_creation_info[i].FsMetadata, sizeof(::CF_FS_METADATA));
+				nt_placeholder_creation_info[i].FsMetadata.FileSize.QuadPart = result.get_creation_info()[i].get_file_size();
+				if (result.get_creation_info()[i].get_file_attributes() & FILE_ATTRIBUTE_DIRECTORY)
+					nt_placeholder_creation_info[i].FsMetadata.FileSize.QuadPart = 0;
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.FileAttributes = result.get_creation_info()[i].get_file_attributes();
 				
 				// The epoch time in MSVC STD's std::filesystem::file_time_type and Windows FILETIME are the same.
 				auto file_times = result.get_creation_info()[i].get_file_times();
-				metadata.BasicInfo.CreationTime.QuadPart = file_times.get_creation_time().time_since_epoch().count();
-				metadata.BasicInfo.LastAccessTime.QuadPart = file_times.get_last_access_time().time_since_epoch().count();
-				metadata.BasicInfo.LastWriteTime.QuadPart = file_times.get_last_write_time().time_since_epoch().count();
-				metadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
-
-				nt_placeholder_creation_info[i].FsMetadata = std::move(metadata);
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.CreationTime.QuadPart = file_times.get_creation_time().time_since_epoch().count();
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.LastAccessTime.QuadPart = file_times.get_last_access_time().time_since_epoch().count();
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.LastWriteTime.QuadPart = file_times.get_last_write_time().time_since_epoch().count();
+				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
 			}
 			operation_parameters.TransferPlaceholders.PlaceholderArray = nt_placeholder_creation_info.get();
 
@@ -169,7 +167,102 @@ namespace linuxplorer::shell::functional {
 		catch (...) {}
 	}
 
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		::CF_OPERATION_INFO operation_info;
+		::ZeroMemory(&operation_info, sizeof(::CF_OPERATION_INFO));
+		operation_info.StructSize = sizeof(::CF_OPERATION_INFO);
+		operation_info.ConnectionKey = info->ConnectionKey;
+		operation_info.TransferKey = info->TransferKey;
+		operation_info.Type = ::CF_OPERATION_TYPE::CF_OPERATION_TYPE_ACK_RENAME;
+		operation_info.CorrelationVector = info->CorrelationVector;
+		operation_info.RequestKey = info->RequestKey;
+		operation_info.SyncStatus = nullptr;
+
+		::CF_OPERATION_PARAMETERS operation_parameters;
+		::ZeroMemory(&operation_parameters, sizeof(::CF_OPERATION_PARAMETERS));
+		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, AckRename) + sizeof(::CF_OPERATION_PARAMETERS::AckRename);
+		operation_parameters.AckRename.Flags = ::CF_OPERATION_ACK_RENAME_FLAGS::CF_OPERATION_ACK_RENAME_FLAG_NONE;
+
+		try {
+			this->m_callback(rename_callback_parameters(info, parameters));
+			operation_parameters.AckRename.CompletionStatus = STATUS_SUCCESS;
+		}
+		catch (const callback_abort_exception& e) {
+			operation_parameters.AckRename.CompletionStatus = e.code();
+		}
+		catch (...) {
+			operation_parameters.AckRename.CompletionStatus = STATUS_UNSUCCESSFUL;
+		}
+
+		::CfExecute(&operation_info, &operation_parameters);
+	}
+
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		try {
+			this->m_callback(rename_completion_callback_parameters(info, parameters));
+		}
+		// ignore all
+		catch (...) {}
+	}
+
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		::CF_OPERATION_INFO operation_info;
+		::ZeroMemory(&operation_info, sizeof(::CF_OPERATION_INFO));
+		operation_info.StructSize = sizeof(::CF_OPERATION_INFO);
+		operation_info.ConnectionKey = info->ConnectionKey;
+		operation_info.TransferKey = info->TransferKey;
+		operation_info.Type = ::CF_OPERATION_TYPE::CF_OPERATION_TYPE_ACK_DELETE;
+		operation_info.CorrelationVector = info->CorrelationVector;
+		operation_info.RequestKey = info->RequestKey;
+		operation_info.SyncStatus = nullptr;
+
+		::CF_OPERATION_PARAMETERS operation_parameters;
+		::ZeroMemory(&operation_parameters, sizeof(::CF_OPERATION_PARAMETERS));
+		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, AckDelete) + sizeof(::CF_OPERATION_PARAMETERS::AckDelete);
+		operation_parameters.AckDelete.Flags = ::CF_OPERATION_ACK_DELETE_FLAGS::CF_OPERATION_ACK_DELETE_FLAG_NONE;
+		try {
+			auto result = this->m_callback(delete_callback_parameters(info, parameters));
+			operation_parameters.AckDelete.CompletionStatus = result.get_status();
+		}
+		catch (const callback_abort_exception& e) {
+			operation_parameters.AckDelete.CompletionStatus = e.code();
+		}
+		catch (...) {
+			operation_parameters.AckDelete.CompletionStatus = STATUS_UNSUCCESSFUL;
+		}
+
+		::CfExecute(&operation_info, &operation_parameters);
+	}
+
+	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion_completion>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		try {
+			this->m_callback(rename_completion_callback_parameters(info, parameters));
+		}
+		// ignore all
+		catch (...) {}
+	}
+
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
     template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion_completion>;
 }

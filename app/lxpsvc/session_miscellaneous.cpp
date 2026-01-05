@@ -1,7 +1,10 @@
 #include "session.hpp"
 
 #include <util/charset/multibyte_wide_compat_helper.hpp>
+#include <util/charset/case_insensitive_char_traits.hpp>
 #include <util/config/app_settings.hpp>
+
+#include <Shlwapi.h>
 
 #include <quill/Backend.h>
 #include <quill/Frontend.h>
@@ -13,8 +16,6 @@
 
 namespace linuxplorer::app::lxpsvc {
 	bool session::initialize_logger_if() noexcept {
-		using chcvt = util::charset::multibyte_wide_compat_helper;
-
 		if (s_logger) {
 			return false;
 		}
@@ -54,6 +55,43 @@ namespace linuxplorer::app::lxpsvc {
 
 	std::uint32_t session::get_session_id() const noexcept {
 		return this->m_session_id;
+	}
+
+	std::wstring session::relative_path_from_syncroot(const std::wstring& absolute_path) const noexcept {
+		auto compare = [](std::wstring_view l, std::wstring_view r) -> int {
+			if (l.length() == r.length()) return util::charset::case_insensitive_char_traits<wchar_t>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+			else return 1;
+		};
+
+		if (compare(this->m_syncroot_dir, absolute_path) != 0) {
+			return absolute_path.substr(this->m_syncroot_dir.length() + 1);
+		}
+		else {
+			return {};
+		}
+	}
+
+	std::wstring session::server_path_from_relative_path(std::wstring_view relative_path) const noexcept {
+		std::wstring result;
+		result.append(L"/").append(relative_path);
+		std::replace(result.begin(), result.end(), L'\\', L'/');
+
+		return result;
+	}
+
+	std::wstring session::build_absolute_path_from(std::wstring_view relative_path) const noexcept {
+		std::wstring result = this->m_syncroot_dir;
+		if (result.size() <= 0) return result; 
+		result.append(L"\\").append(relative_path);
+		return result;
+	}
+
+	std::wstring session::extract_parent_path(std::wstring_view path) const noexcept {
+		std::wstring result;
+		auto last_separator_pos = path.find_last_of(L'\\');
+		if (last_separator_pos != std::wstring_view::npos) result = path.substr(0, last_separator_pos);
+
+		return result;
 	}
 
 	session::~session() {}

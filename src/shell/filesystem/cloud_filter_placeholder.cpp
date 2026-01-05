@@ -7,25 +7,17 @@ namespace linuxplorer::shell::filesystem {
 	cloud_filter_placeholder::cloud_filter_placeholder(const cloud_provider_session& session, std::wstring_view relative_path) {
 		this->m_absolute_path.append(session.get_sync_root_dir()).append(L"\\").append(relative_path);
 		
-		this->m_handle = ::CreateFileW(
-			this->m_absolute_path.c_str(),
-			FILE_READ_ATTRIBUTES,
-			FILE_SHARE_READ,
-			nullptr,
-			OPEN_EXISTING,
-			FILE_FLAG_BACKUP_SEMANTICS,
-			nullptr
-		);
-		if (this->m_handle == INVALID_HANDLE_VALUE) {
-			std::error_code ec(::GetLastError(), std::system_category());
-			throw cloud_provider_system_error(ec, "Failed to open a file.");
-		}
-
+		this->open_handle();
 		this->fetch();
 	}
 
-	cloud_filter_placeholder::cloud_filter_placeholder(cloud_filter_placeholder&& rhs) : m_id(rhs.m_id), m_absolute_path(std::move(rhs.m_absolute_path)), 
-		m_handle(rhs.m_handle), m_type(placeholder_type::file), m_in_sync_marked(rhs.m_in_sync_marked)
+	cloud_filter_placeholder::cloud_filter_placeholder(cloud_filter_placeholder&& rhs) : 
+		m_id(rhs.m_id),
+		m_absolute_path(std::move(rhs.m_absolute_path)),
+		m_handle(rhs.m_handle), m_type(placeholder_type::file),
+		m_in_sync_marked(rhs.m_in_sync_marked),
+		m_pin_state(rhs.m_pin_state),
+		m_identity(std::move(rhs.m_identity))
 	{
 		rhs.m_handle = INVALID_HANDLE_VALUE;
 	}
@@ -150,9 +142,7 @@ namespace linuxplorer::shell::filesystem {
 			sizeof(::CF_PLACEHOLDER_BASIC_INFO),
 			nullptr
 		);
-		/*
-			HRESULT 0x80070178: The file is not a cloud file.
-		*/
+		
 		constexpr ::HRESULT ERROR_FILE_NOT_CLOUD_FILE = static_cast<::HRESULT>(0x80070178);
 		if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA) && hr != ERROR_FILE_NOT_CLOUD_FILE) {
 			std::error_code ec(hr, std::system_category());
@@ -165,25 +155,41 @@ namespace linuxplorer::shell::filesystem {
 	void cloud_filter_placeholder::internal_primary_fetch() {
 		::HRESULT hr;
 
-		::CF_PLACEHOLDER_STANDARD_INFO placeholder_info;
+		auto placeholder_info = std::make_unique<::CF_PLACEHOLDER_STANDARD_INFO>();
 		hr = ::CfGetPlaceholderInfo(
 			this->m_handle,
 			::CF_PLACEHOLDER_INFO_CLASS::CF_PLACEHOLDER_INFO_STANDARD,
-			&placeholder_info,
+			placeholder_info.get(),
 			sizeof(::CF_PLACEHOLDER_STANDARD_INFO),
 			nullptr
 		);
-		if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA)) {
+		
+		if (hr == HRESULT_FROM_WIN32(ERROR_MORE_DATA)) {
+			std::size_t bytes_placeholder_info = sizeof(CF_PLACEHOLDER_STANDARD_INFO) + placeholder_info->FileIdentityLength;
+			placeholder_info.reset(reinterpret_cast<::CF_PLACEHOLDER_STANDARD_INFO*>(new std::byte[bytes_placeholder_info]));
+			hr = ::CfGetPlaceholderInfo(
+				this->m_handle,
+				::CF_PLACEHOLDER_INFO_CLASS::CF_PLACEHOLDER_INFO_STANDARD,
+				placeholder_info.get(),
+				bytes_placeholder_info,
+				nullptr
+			);
+		}
+		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
 			throw cloud_provider_system_error(ec, "Failed to get placeholder information.");
 		}
 
 		std::uint32_t attr = ::GetFileAttributesW(this->m_absolute_path.c_str());
 
-		this->m_id = placeholder_info.FileId.QuadPart;
-		this->m_in_sync_marked = placeholder_info.InSyncState;
+		this->m_id = placeholder_info->FileId.QuadPart;
+		this->m_in_sync_marked = placeholder_info->InSyncState;
 		this->m_type = attr & FILE_ATTRIBUTE_DIRECTORY ? placeholder_type::directory : placeholder_type::file;
-		this->m_pin_state = placeholder_info.PinState;
+		this->m_pin_state = placeholder_info->PinState;
+		this->m_identity = std::vector<std::byte>(
+			reinterpret_cast<std::byte*>(placeholder_info->FileIdentity),
+			reinterpret_cast<std::byte*>(placeholder_info->FileIdentity + placeholder_info->FileIdentityLength)
+		);
 	}
 
 	void cloud_filter_placeholder::internal_primary_flush() const {
@@ -193,8 +199,8 @@ namespace linuxplorer::shell::filesystem {
 		::HRESULT hr = ::CfUpdatePlaceholder(
 		this->m_handle,
 		nullptr,
-		nullptr,
-		0,
+		this->m_identity.data(),
+		this->m_identity.size() * sizeof(std::byte),
 		nullptr,
 		0,
 		flags,
@@ -254,12 +260,22 @@ namespace linuxplorer::shell::filesystem {
 		this->m_pin_state = state;
 	}
 
-	internal::always_complete_suspendable<void> cloud_filter_placeholder::reopen_handle_suspendable() {
-		::CloseHandle(this->m_handle);
+	const std::vector<std::byte>& cloud_filter_placeholder::get_identity() const noexcept {
+		return this->m_identity;
+	}
+
+	void cloud_filter_placeholder::set_identity(const std::vector<std::byte>& identity) noexcept {
+		this->m_identity = identity;
+	}
+
+	void cloud_filter_placeholder::close_handle() {
+		if (this->m_handle != INVALID_HANDLE_VALUE) {
+			::CloseHandle(this->m_handle);
+		}
 		this->m_handle = INVALID_HANDLE_VALUE;
+	}
 
-		co_await internal::temporarily_suspend{};
-
+	void cloud_filter_placeholder::open_handle() {
 		this->m_handle = ::CreateFileW(
 			this->m_absolute_path.c_str(),
 			FILE_READ_ATTRIBUTES,
@@ -273,14 +289,10 @@ namespace linuxplorer::shell::filesystem {
 			std::error_code ec(::GetLastError(), std::system_category());
 			throw cloud_provider_system_error(ec, "Failed to open a file.");
 		}
-
-		co_return;
 	}
 
 	cloud_filter_placeholder::~cloud_filter_placeholder() {
-		if (this->m_handle != INVALID_HANDLE_VALUE) {
-			::CloseHandle(this->m_handle);
-		}
+		this->close_handle();
 	}
 
 	file_placeholder::file_placeholder(const cloud_provider_session& session, std::wstring_view relative_path) : cloud_filter_placeholder(session, relative_path) {}
@@ -288,7 +300,7 @@ namespace linuxplorer::shell::filesystem {
 	file_placeholder::file_placeholder(file_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {}
 
 	file_placeholder::file_placeholder(cloud_filter_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {
-		this->fetch();
+		this->internal_secondary_fetch();
 	}
 
 	file_placeholder::~file_placeholder() {}
@@ -341,46 +353,53 @@ namespace linuxplorer::shell::filesystem {
 	}
 
 	void file_placeholder::dehydrate(std::size_t offset, std::size_t length) {
+		std::exception_ptr exptr;
+		this->close_handle();
+
+		try {
+			this->internal_dehydrate(offset, length);
+		}
+		catch (...) {
+			exptr = std::current_exception();
+		}
+		this->open_handle();
+
+		if (exptr) std::rethrow_exception(exptr);
+	}
+
+	void file_placeholder::internal_dehydrate(std::size_t offset, std::size_t length) {
 		if (this->get_type() != placeholder_type::file) {
 			throw cloud_provider_runtime_exception("Hydration not supported for non-file type placeholders.");
 		}
 
-		std::exception_ptr exptr;
-		{
-			auto coro = this->reopen_handle_suspendable();
-			coro.set_exception_ptr(exptr);
+		::HRESULT hr;
 
-			::HRESULT hr;
-
-			using unique_cfhandle = std::unique_ptr<std::remove_pointer_t<::HANDLE>, decltype([](::HANDLE handle) { ::CfCloseHandle(handle); })>;
-			unique_cfhandle protected_handle;
-			
-			::HANDLE protected_nthandle;
-			hr = ::CfOpenFileWithOplock(
-				this->get_path().data(),
-				::CF_OPEN_FILE_FLAGS::CF_OPEN_FILE_FLAG_EXCLUSIVE | ::CF_OPEN_FILE_FLAGS::CF_OPEN_FILE_FLAG_WRITE_ACCESS,
-				&protected_nthandle
-			);
-			if (FAILED(hr)) {
-				std::error_code ec(hr, std::system_category());
-				throw cloud_provider_system_error(ec, "Failed to acquire exclusiveness to prevent data corruption by simultaneously dehydrations.");
-			}
-
-			protected_handle.reset(protected_nthandle);
-
-			::LARGE_INTEGER nt_offset;
-			nt_offset.QuadPart = offset;
-			::LARGE_INTEGER nt_length;
-			nt_length.QuadPart = length;
-
-			hr = ::CfDehydratePlaceholder(protected_handle.get(), nt_offset, nt_length, ::CF_DEHYDRATE_FLAGS::CF_DEHYDRATE_FLAG_NONE, nullptr);
-			if (FAILED(hr)) {
-				std::error_code ec(hr, std::system_category());
-				throw cloud_provider_system_error(ec, "Failed to dehydrate placeholder file.");
-			}
+		using unique_cfhandle = std::unique_ptr<std::remove_pointer_t<::HANDLE>, decltype([](::HANDLE handle) { ::CfCloseHandle(handle); })>;
+		unique_cfhandle protected_handle;
+		
+		::HANDLE protected_nthandle;
+		hr = ::CfOpenFileWithOplock(
+			this->get_path().data(),
+			::CF_OPEN_FILE_FLAGS::CF_OPEN_FILE_FLAG_EXCLUSIVE | ::CF_OPEN_FILE_FLAGS::CF_OPEN_FILE_FLAG_WRITE_ACCESS,
+			&protected_nthandle
+		);
+		if (FAILED(hr)) {
+			std::error_code ec(hr, std::system_category());
+			throw cloud_provider_system_error(ec, "Failed to acquire exclusiveness to prevent data corruption by simultaneously dehydrations.");
 		}
 
-		if (exptr) std::rethrow_exception(exptr);
+		protected_handle.reset(protected_nthandle);
+
+		::LARGE_INTEGER nt_offset;
+		nt_offset.QuadPart = offset;
+		::LARGE_INTEGER nt_length;
+		nt_length.QuadPart = length;
+
+		hr = ::CfDehydratePlaceholder(protected_handle.get(), nt_offset, nt_length, ::CF_DEHYDRATE_FLAGS::CF_DEHYDRATE_FLAG_NONE, nullptr);
+		if (FAILED(hr)) {
+			std::error_code ec(hr, std::system_category());
+			throw cloud_provider_system_error(ec, "Failed to dehydrate placeholder file.");
+		}
 	}
 
 	directory_placeholder::directory_placeholder(const cloud_provider_session& session, std::wstring_view relative_path) : cloud_filter_placeholder(session, relative_path) {}
@@ -388,12 +407,12 @@ namespace linuxplorer::shell::filesystem {
 	directory_placeholder::directory_placeholder(directory_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)), m_enumeration_enabled(rhs.m_enumeration_enabled) {}
 
 	directory_placeholder::directory_placeholder(cloud_filter_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {
-		this->fetch();
+		this->internal_secondary_fetch();
 	}
 
 	void directory_placeholder::internal_secondary_flush() const {
 		::CF_UPDATE_FLAGS flags = ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_NONE;
-		flags |= this->m_enumeration_enabled ? ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_ENABLE_ON_DEMAND_POPULATION : ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_ENABLE_ON_DEMAND_POPULATION;
+		flags |= this->m_enumeration_enabled ? ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_ENABLE_ON_DEMAND_POPULATION : ::CF_UPDATE_FLAGS::CF_UPDATE_FLAG_DISABLE_ON_DEMAND_POPULATION;
 
 		::HRESULT hr = ::CfUpdatePlaceholder(
 		this->get_handle(),

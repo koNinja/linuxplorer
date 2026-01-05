@@ -12,6 +12,8 @@
 #include <shell/cloud_provider_exception.hpp>
 #include <shell/filesystem/cloud_provider_registrar.hpp>
 
+#include <util/config/profiles.hpp>
+
 #include <quill/LogMacros.h>
 
 #define GENERATE_CALLBACK_THIS(callback_type, callback)	shell::functional::specialized_cloud_provider_callback<callback_type>([this](const shell::functional::internal::typed_callback_aliases<callback_type>::callback_parameters& parameters) -> shell::functional::internal::typed_callback_aliases<callback_type>::operation_info { return callback(parameters); })
@@ -64,10 +66,13 @@ namespace linuxplorer::app::lxpsvc {
 
 			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_data, this->on_fetch_data));
 			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_placeholders, this->on_fetch_placeholders));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::cancel_fetching_data, this->on_cancel_fetch_data));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::notify_deletion, this->on_delete));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::notify_renaming, this->on_rename));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::notify_renaming_completion, this->on_rename_completion));
 
 			this->m_cloud_session->connect();
 			LOG_INFO(s_logger, "The cloud provider service started successfully in session #{}.", this->m_session_id);
-
 
 			LOG_INFO(s_logger, "Session #{} has been started successfully.", this->m_session_id);
 			this->m_exit_code = this->main();

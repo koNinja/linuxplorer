@@ -159,6 +159,11 @@ namespace linuxplorer::app::linuxplorer {
 			return 1;
 		}
 
+		auto root_path = util::config::configuration_manager::get_root_path();
+		if (!::PathFileExistsW(root_path.c_str())) {
+			util::config::configuration_manager::initialize();
+		}
+
 		if (options.count("version")) {
 			std::wcout << L"linuxplorer version: " << WSTRINGIFY(LINUXPLORER_VERSION) << std::endl;
 			return 0;
@@ -772,7 +777,7 @@ namespace linuxplorer::app::linuxplorer {
 				rc = set_reg_value(key, L"DisplayNameResource", std::wstring(profile_name));
 				if (rc != ERROR_SUCCESS) failed_once = true;
 
-				constexpr ::DWORD flags_value = 0x422;
+				constexpr ::DWORD flags_value = 0x22;
 				rc = set_reg_value(key, L"Flags", flags_value);
 				if (rc != ERROR_SUCCESS) failed_once = true;
 

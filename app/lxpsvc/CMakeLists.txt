@@ -10,7 +10,8 @@ target_compile_definitions(${LINUXPLORER_APP_SERVICE_NAME}
 )
 target_sources(${LINUXPLORER_APP_SERVICE_NAME} PRIVATE
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/session_main.cpp
-	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/session_cf_callbacks.cpp
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/session_callbacks.cpp
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/session_event_handlers.cpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/session_loader.cpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/session_miscellaneous.cpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/main.cpp
@@ -24,6 +25,7 @@ target_link_libraries(
 	quill::quill
 	cldapi
 	propsys
+	shlwapi
 )
 install(TARGETS ${LINUXPLORER_APP_SERVICE_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
