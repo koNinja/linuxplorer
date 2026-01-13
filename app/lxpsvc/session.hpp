@@ -69,6 +69,8 @@ namespace linuxplorer::app::lxpsvc {
 
 		inline static constexpr std::size_t s_dummy_blob_length = 1;
 		inline static constexpr std::byte s_dummy_blob[s_dummy_blob_length] = {};
+
+		inline static constexpr std::chrono::seconds s_keepalive_duration = std::chrono::seconds(30);
 	private:
 		using chcvt = util::charset::multibyte_wide_compat_helper;
 
@@ -82,7 +84,15 @@ namespace linuxplorer::app::lxpsvc {
 		
 		std::int32_t m_exit_code;
 		
+		std::mutex m_ssh_mutex;
 		std::mutex m_sftp_mutex;
+
+		void build_ssh_sftp_sessions(std::uint16_t port, std::wstring_view host, std::wstring_view username, std::wstring_view password);
+
+		unique_nthandle m_death_event;
+		std::atomic<bool> m_session_watching_done;
+		void watch_ssh_sessions() noexcept;
+		std::optional<std::thread> m_watcher;
 		
 		int main();
 		void stop() noexcept;

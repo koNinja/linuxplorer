@@ -121,10 +121,11 @@ namespace linuxplorer::app::lxpsvc {
 				return 1;
 			}
 
-			constexpr std::size_t handles_count = 2;
-			::HANDLE handles[2] = {
+			constexpr std::size_t handles_count = 3;
+			::HANDLE handles[handles_count] = {
 				termination_event_handle.get(),
-				changes_detecion_event_handle.get()
+				changes_detecion_event_handle.get(),
+				this->m_death_event.get()
 			};
 
 			::DWORD wait_response = ::MsgWaitForMultipleObjectsEx(
@@ -136,8 +137,8 @@ namespace linuxplorer::app::lxpsvc {
 			);
 
 			switch (wait_response) {
-			// app termination event
-			case WAIT_OBJECT_0:
+			case WAIT_OBJECT_0:		// app termination event
+			case WAIT_OBJECT_0 + 2:	// session termination event
 			{
 				return 0;
 			}
