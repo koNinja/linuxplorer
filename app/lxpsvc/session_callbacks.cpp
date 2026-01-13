@@ -52,7 +52,9 @@ namespace linuxplorer::app::lxpsvc {
 	shell::models::chunked_callback_generator<shell::functional::fetch_data_operation_info> session::on_fetch_data(const shell::functional::fetch_data_callback_parameters& parameters) {
 		LOG_INFO(s_logger, "Data fetch for '{}' requested by the system in session #{}.", util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(parameters.get_absolute_placeholder_path()), this->m_session_id);
 		
-		this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart].store(false);
+		std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
+		this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart] = false;
+		fetch_cancel_token_unique_lock.unlock();
 
 		std::wstring relative_placeholder_path_str = this->relative_path_from_syncroot(std::wstring(parameters.get_absolute_placeholder_path()));
 		std::wstring absolute_query_path_str = this->server_path_from_relative_path(relative_placeholder_path_str);
@@ -64,8 +66,18 @@ namespace linuxplorer::app::lxpsvc {
 			std::streamsize bytes_remaining = parameters.get_length();
 			std::size_t bytes_offset = parameters.get_offset();
 			std::streamsize bytes_has_read = 0;
+			iss.seekg(bytes_offset);
 			do {
-				if (this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart].load()) co_return;
+				std::shared_lock fetch_cancel_token_shared_lock(this->m_fetch_cancel_tokens_mutex);
+				if (this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart]) {
+					LOG_INFO(
+						s_logger,
+						"Download for '{}' has been cancelled in session #{}", 
+						chcvt::convert_wide_to_multibyte(absolute_query_path_str),
+						this->m_session_id
+					);
+				}
+				fetch_cancel_token_shared_lock.unlock();
 				
 				std::streamsize bytes_to_read = std::min(unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
 				std::vector<std::byte> data(bytes_to_read);
@@ -94,12 +106,16 @@ namespace linuxplorer::app::lxpsvc {
 			}
 			while (bytes_has_read > 0 && bytes_remaining > 0);
 
+			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+			fetch_cancel_token_unique_lock.unlock();
 
 			co_return;
 		}
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
+			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+			fetch_cancel_token_unique_lock.unlock();
 
 			LOG_CRITICAL(
 				s_logger,
@@ -112,7 +128,9 @@ namespace linuxplorer::app::lxpsvc {
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
+			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+			fetch_cancel_token_unique_lock.unlock();
 
 			LOG_CRITICAL(
 				s_logger,
@@ -125,7 +143,9 @@ namespace linuxplorer::app::lxpsvc {
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (...) {
+			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
+			fetch_cancel_token_unique_lock.unlock();
 
 			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
@@ -147,7 +167,7 @@ namespace linuxplorer::app::lxpsvc {
 		shell::functional::fetch_placeholders_operation_info result;
 		int skipped = 0;
 
-		std::unique_lock<std::mutex> lock(this->m_sftp_mutex);
+		std::unique_lock lock(this->m_sftp_mutex);
 		try {
 			for (const auto& relative_query_entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session.value(), absolute_query_dir_path_str)) {
 				auto placeholder_name_str = relative_query_entity.path().filename().wstring();
@@ -266,8 +286,11 @@ namespace linuxplorer::app::lxpsvc {
 	}
 
 	void session::on_cancel_fetch_data(const shell::functional::cancel_fetch_data_callback_parameters& parameters) {
-		if (this->m_fetch_cancel_tokens.contains(parameters.get_native_info().FileId.QuadPart))
-			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart].store(true);
+		if (this->m_fetch_cancel_tokens.contains(parameters.get_native_info().FileId.QuadPart)) {
+			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
+			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart] = false;
+			fetch_cancel_token_unique_lock.unlock();
+		}
 	}
 
 	shell::functional::delete_operation_info session::on_delete(const shell::functional::delete_callback_parameters& parameters) {
@@ -282,6 +305,7 @@ namespace linuxplorer::app::lxpsvc {
 				return result;
 			}
 
+			std::unique_lock lock(this->m_sftp_mutex);
 			// Skip if the file doesn't exist on the server.
 			try { ssh::sftp::filesystem::status(this->m_sftp_session.value(), server_path); } 
 			catch (...) {
@@ -323,6 +347,7 @@ namespace linuxplorer::app::lxpsvc {
 		try {
 			LOG_INFO(s_logger, "Detected file renaming of '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_old_client_path), this->m_session_id);
 			
+			std::unique_lock lock(this->m_sftp_mutex);
 			// If the new path is under the syncroot, rename it on the server.
 			if (is_under(absolute_new_client_path, this->m_syncroot_dir)) {
 				ssh::sftp::filesystem::rename(this->m_sftp_session.value(), absolute_old_server_path, absolute_new_server_path);

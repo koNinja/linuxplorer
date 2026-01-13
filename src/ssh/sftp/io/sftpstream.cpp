@@ -188,7 +188,7 @@ namespace linuxplorer::ssh::sftp::io {
 	sftpbuf::pos_type sftpbuf::seekpos(sftpbuf::pos_type pos, std::ios_base::openmode which) {
 		if (which & std::ios_base::in) {
 			this->m_in_seek = pos;
-			this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get() + this->m_inbufsize);
+			this->setg(this->m_inbuf.get(), this->m_inbuf.get(), this->m_inbuf.get());
 		}
 
 		if (which & std::ios_base::out) {

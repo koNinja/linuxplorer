@@ -31,10 +31,6 @@ namespace linuxplorer::util::config {
 		return get_root_path() + L"\\config.json";
 	}
 
-	std::wstring configuration_manager::get_cache_root() {
-		return get_root_path() + L"\\cache";
-	}
-
 	std::wstring configuration_manager::get_install_path() {
 		constexpr std::size_t path_len = MAX_PATH;
 		wchar_t module_file_path[path_len];
@@ -56,7 +52,6 @@ namespace linuxplorer::util::config {
 	void configuration_manager::initialize() {
 		try {
 			std::filesystem::create_directories(get_root_path());
-			std::filesystem::create_directories(get_cache_root());
 
 			std::ofstream ofs;
 			ofs.exceptions(std::ios_base::badbit | std::ios_base::failbit);

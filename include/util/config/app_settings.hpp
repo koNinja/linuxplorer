@@ -94,7 +94,6 @@ namespace linuxplorer::util::config {
 
 		static std::wstring get_root_path();
 		static std::wstring get_config_path();
-		static std::wstring get_cache_root();
 		static std::wstring get_log_path();
 		static std::wstring get_install_path();
 	};

@@ -36,7 +36,6 @@ namespace linuxplorer::app::lxpsvc {
 
 
 			LOG_INFO(s_logger, "Connecting to SSH server in session #{}.", this->m_session_id);
-
 			this->m_ssh_session->connect();
 			LOG_INFO(s_logger, "Connected to SSH server successfully in session #{}.", this->m_session_id);
 

@@ -4,7 +4,6 @@
 #include <optional>
 #include <mutex>
 #include <shared_mutex>
-#include <atomic>
 #include <unordered_map>
 
 #include <ssh/ssh_address.hpp>
@@ -66,7 +65,7 @@ namespace linuxplorer::app::lxpsvc {
 		using read_usn_journal_data_t = ::READ_USN_JOURNAL_DATA_V1;
 		using usn_record_t = ::USN_RECORD_V3;
 
-		inline static constexpr std::chrono::seconds s_refetch_period = std::chrono::seconds(300);
+		inline static constexpr std::chrono::seconds s_refetch_period = std::chrono::seconds(60);
 
 		inline static constexpr std::size_t s_dummy_blob_length = 1;
 		inline static constexpr std::byte s_dummy_blob[s_dummy_blob_length] = {};
@@ -84,7 +83,6 @@ namespace linuxplorer::app::lxpsvc {
 		std::int32_t m_exit_code;
 		
 		std::mutex m_sftp_mutex;
-		std::shared_mutex m_this_session_mutex;
 		
 		int main();
 		void stop() noexcept;
@@ -104,7 +102,8 @@ namespace linuxplorer::app::lxpsvc {
 		void internal_transform_children_recursive(const std::filesystem::path& absolute_client_path, const std::filesystem::path& relative_client_path, const std::filesystem::path& server_path);
 		void on_moved_from_external(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path);
 
-		std::unordered_map<std::uint64_t, std::atomic<bool>> m_fetch_cancel_tokens;
+		std::unordered_map<std::uint64_t, bool> m_fetch_cancel_tokens;
+		std::shared_mutex m_fetch_cancel_tokens_mutex;
 
 		std::wstring relative_path_from_syncroot(const std::wstring& absolute_path) const noexcept;
 		std::wstring build_absolute_path_from(std::wstring_view relative_path) const noexcept;
