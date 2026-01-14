@@ -5,6 +5,8 @@
 #include <shlwapi.h>
 
 #include <regex>
+#include <unordered_set>
+
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 #include <util/charset/case_insensitive_char_traits.hpp>
 
@@ -167,8 +169,10 @@ namespace linuxplorer::app::lxpsvc {
 		shell::functional::fetch_placeholders_operation_info result;
 		int skipped = 0;
 
-		std::unique_lock lock(this->m_sftp_mutex);
 		try {
+			std::unique_lock lock(this->m_sftp_mutex);
+
+			std::unordered_set<std::filesystem::path> entities_on_server;
 			for (const auto& relative_query_entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session.value(), absolute_query_dir_path_str)) {
 				auto placeholder_name_str = relative_query_entity.path().filename().wstring();
 				
@@ -178,10 +182,15 @@ namespace linuxplorer::app::lxpsvc {
 					skipped++;
 					continue;
 				}
+
+				entities_on_server.emplace(placeholder_name_str);
 				
 				std::filesystem::path absolute_query_entity_path = absolute_query_dir_path_str;
 				if (absolute_query_dir_path_str != L"/") absolute_query_entity_path += L"/";
 				absolute_query_entity_path += relative_query_entity.path();
+
+				std::filesystem::path absolute_client_entity_path(absolute_placeholder_path_str);
+				absolute_client_entity_path /= placeholder_name_str;
 
 				shell::filesystem::file_times file_times;
 				file_times.set_last_write_time(relative_query_entity.last_write_time());
@@ -201,17 +210,47 @@ namespace linuxplorer::app::lxpsvc {
 						continue;
 				}
 
-				shell::filesystem::placeholder_creation_info info(
-					placeholder_name_str,
-					relative_query_entity.file_size(),
-					file_attributes,
-					file_times
-				);
+				if (
+					::PathFileExistsW(absolute_client_entity_path.c_str()) && 
+					std::filesystem::status(absolute_client_entity_path).type() == relative_query_entity.status().type()
+				) {
+					shell::filesystem::cloud_filter_placeholder placeholder(this->m_cloud_session.value(), this->relative_path_from_syncroot(absolute_client_entity_path));
+					placeholder.set_file_times(std::move(file_times));
+					if (placeholder.get_type() == shell::filesystem::placeholder_type::file) {
+						shell::filesystem::file_placeholder file_ph(std::move(placeholder));
+						file_ph.set_file_size(relative_query_entity.file_size());
+						file_ph.set_marked_in_sync(true);
+						file_ph.flush();
+					}
+					else {
+						shell::filesystem::directory_placeholder dir_ph(std::move(placeholder));
+						dir_ph.set_marked_in_sync(true);
+						dir_ph.flush();
+					}
+				}
+				else {
+					shell::filesystem::placeholder_creation_info info(
+						placeholder_name_str,
+						relative_query_entity.file_size(),
+						file_attributes,
+						std::move(file_times)
+					);
 
-				auto absolute_query_entity_path_str = absolute_query_entity_path.wstring();
-				info.set_identity(std::vector<std::byte>(s_dummy_blob, s_dummy_blob + s_dummy_blob_length));
+					auto absolute_query_entity_path_str = absolute_query_entity_path.wstring();
+					info.set_identity(std::vector<std::byte>(s_dummy_blob, s_dummy_blob + s_dummy_blob_length));
 
-				result.add_creation_info(std::move(info));
+					result.add_creation_info(std::move(info));
+				}
+			}
+
+			lock.unlock();
+
+			for (const auto& entity_on_disk : std::filesystem::directory_iterator(absolute_placeholder_path_str)) {
+				if (entities_on_server.contains(entity_on_disk.path().filename())) continue;
+				std::filesystem::path path = absolute_placeholder_path_str;
+				path /= entity_on_disk.path();
+
+				std::filesystem::remove_all(path);
 			}
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
@@ -226,8 +265,6 @@ namespace linuxplorer::app::lxpsvc {
 			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
-
-		lock.unlock();
 
 		auto placeholder_count = result.get_count_to_be_processed();
 		result.set_total_count_to_be_processed(placeholder_count);
