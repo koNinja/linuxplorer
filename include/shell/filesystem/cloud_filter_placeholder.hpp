@@ -13,7 +13,16 @@ namespace linuxplorer::shell::filesystem {
 		directory
 	};
 
+	class placeholder_type_inconsistency_exception : cloud_provider_runtime_exception {
+	public:
+		explicit placeholder_type_inconsistency_exception(const char* message) : cloud_provider_runtime_exception(message) {}
+		explicit placeholder_type_inconsistency_exception(const std::string& message) : cloud_provider_runtime_exception(message) {}
+		virtual ~placeholder_type_inconsistency_exception() noexcept = default;
+	};
+
 	class LINUXPLORER_SHELL_API cloud_filter_placeholder {
+	private:
+		
 	private:
 		void internal_primary_fetch();
 		void internal_primary_flush() const;
@@ -24,6 +33,8 @@ namespace linuxplorer::shell::filesystem {
 		std::uint64_t m_id;
 		::CF_IN_SYNC_STATE m_in_sync_marked;
 		::CF_PIN_STATE m_pin_state;
+
+		file_times m_file_times;
 
 		std::vector<std::byte> m_identity;
 	protected:
@@ -56,13 +67,20 @@ namespace linuxplorer::shell::filesystem {
 		::CF_PIN_STATE get_pin_state() const noexcept;
 		void set_pin_state(::CF_PIN_STATE state) noexcept;
 
+		const file_times& get_file_times() const noexcept;
+		void set_file_times(const file_times& file_times) noexcept;
+
 		const std::vector<std::byte>& get_identity() const noexcept;
 		void set_identity(const std::vector<std::byte>& identity) noexcept;
 	};
 
 	class LINUXPLORER_SHELL_API file_placeholder : public cloud_filter_placeholder {
 	private:
-		void internal_dehydrate(std::size_t offset, std::size_t length);
+		void internal_dehydrate(std::size_t offset, std::streamsize length);
+		std::size_t m_file_size;
+	protected:
+		virtual void internal_secondary_fetch() override;
+		virtual void internal_secondary_flush() const override;
 	public:
 		file_placeholder(const cloud_provider_session& session, std::wstring_view relative_path);
 		file_placeholder(const file_placeholder&) = delete;
@@ -72,9 +90,12 @@ namespace linuxplorer::shell::filesystem {
 		virtual ~file_placeholder();
 
 		virtual void hydrate() const;
-		virtual void hydrate(std::size_t offset, std::size_t length) const;
+		virtual void hydrate(std::size_t offset, std::streamsize length) const;
 		virtual void dehydrate();
-		virtual void dehydrate(std::size_t offset, std::size_t length);
+		virtual void dehydrate(std::size_t offset, std::streamsize length);
+
+		std::size_t get_file_size() const noexcept;
+		void set_file_size(std::size_t file_size) noexcept;
 	};
 
 	class LINUXPLORER_SHELL_API directory_placeholder : public cloud_filter_placeholder {
