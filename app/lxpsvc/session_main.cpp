@@ -172,7 +172,7 @@ namespace linuxplorer::app::lxpsvc {
 			case WAIT_FAILED:
 			{
 				std::error_code ec(::GetLastError(), std::system_category());
-				LOG_ERROR(s_logger, "Failed to wait for the terminate event in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
+				LOG_CRITICAL(s_logger, "Failed to wait for the events in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
 				return 1;
 			}
 			default:

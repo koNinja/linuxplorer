@@ -119,7 +119,7 @@ namespace linuxplorer::app::lxpsvc {
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
 			fetch_cancel_token_unique_lock.unlock();
 
-			LOG_CRITICAL(
+			LOG_ERROR(
 				s_logger,
 				"Failed to read file data via isftpstream in session #{}: {} (libssh2: {}({}))",
 				this->m_session_id,
@@ -134,7 +134,7 @@ namespace linuxplorer::app::lxpsvc {
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
 			fetch_cancel_token_unique_lock.unlock();
 
-			LOG_CRITICAL(
+			LOG_ERROR(
 				s_logger,
 				"Failed to SSH operations in session #{}: {} (libssh2: {}({}))",
 				this->m_session_id,
@@ -149,7 +149,7 @@ namespace linuxplorer::app::lxpsvc {
 			this->m_fetch_cancel_tokens.erase(parameters.get_native_info().FileId.QuadPart);
 			fetch_cancel_token_unique_lock.unlock();
 
-			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
+			LOG_ERROR(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 	}
@@ -169,10 +169,19 @@ namespace linuxplorer::app::lxpsvc {
 		shell::functional::fetch_placeholders_operation_info result;
 		int skipped = 0;
 
+		auto tolower_sys_localized = [](std::wstring_view str) {
+			std::wstring s(str);
+			std::locale loc("");
+			std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) { 
+				return std::tolower(c, loc); }
+			);
+			return s;
+		};
+
 		try {
 			std::unique_lock lock(this->m_sftp_mutex);
 
-			std::unordered_set<std::filesystem::path> entities_on_server;
+			std::unordered_set<std::filesystem::path> occupied_lower_filenames;
 			for (const auto& relative_query_entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session.value(), absolute_query_dir_path_str)) {
 				auto placeholder_name_str = relative_query_entity.path().filename().wstring();
 				
@@ -183,7 +192,33 @@ namespace linuxplorer::app::lxpsvc {
 					continue;
 				}
 
-				entities_on_server.emplace(placeholder_name_str);
+				auto placeholder_name_str_lower = tolower_sys_localized(placeholder_name_str);
+				if (occupied_lower_filenames.contains(placeholder_name_str_lower)) {
+					LOG_WARNING(
+						s_logger,
+						"Skip '{}' because there are files that are considered to have the same name in Windows, in session #{}",
+						relative_query_entity.path().filename().string(),
+						this->m_session_id
+					);
+
+					auto citr = std::find_if(result.get_creation_info().cbegin(), result.get_creation_info().cend(), [&compare, placeholder_name_str_lower](const shell::filesystem::placeholder_creation_info& info) {
+						return compare(info.get_relative_path(), placeholder_name_str_lower) == 0;
+					});
+					if (citr != result.get_creation_info().cend()) {
+						LOG_WARNING(
+							s_logger,
+							"Cancel creation of '{}' because there are files that are considered to have the same name in Windows, in session #{}",
+							util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(citr->get_relative_path()),
+							this->m_session_id
+						);
+
+						result.remove_creation_info_at(std::distance(result.get_creation_info().cbegin(), citr));
+					}
+
+					continue;
+				}
+
+				occupied_lower_filenames.emplace(placeholder_name_str_lower);
 				
 				std::filesystem::path absolute_query_entity_path = absolute_query_dir_path_str;
 				if (absolute_query_dir_path_str != L"/") absolute_query_entity_path += L"/";
@@ -246,23 +281,24 @@ namespace linuxplorer::app::lxpsvc {
 			lock.unlock();
 
 			for (const auto& entity_on_disk : std::filesystem::directory_iterator(absolute_placeholder_path_str)) {
-				if (entities_on_server.contains(entity_on_disk.path().filename())) continue;
+				if (occupied_lower_filenames.contains(tolower_sys_localized(entity_on_disk.path().filename().wstring()))) continue;
 				std::filesystem::path path = absolute_placeholder_path_str;
 				path /= entity_on_disk.path();
 
+				LOG_INFO(s_logger, "Delete '{}' because the file does not exist in the server, in session #{}.", path.string(), this->m_session_id);
 				std::filesystem::remove_all(path);
 			}
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
-			LOG_CRITICAL(s_logger, "Failed to enumerate directory entities of '{}', in session #{}.", chcvt::convert_wide_to_multibyte(absolute_query_dir_path_str), this->m_session_id);
+			LOG_ERROR(s_logger, "Failed to enumerate directory entities of '{}', in session #{}.", chcvt::convert_wide_to_multibyte(absolute_query_dir_path_str), this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (const std::filesystem::filesystem_error& e) {
-			LOG_CRITICAL(s_logger, "Failed to filesystem operations: {}, in session #{}. (Win32: {}({}))", e.what(), this->m_session_id, e.code().message(), e.code().value());
+			LOG_ERROR(s_logger, "Failed to filesystem operations: {}, in session #{}. (Win32: {}({}))", e.what(), this->m_session_id, e.code().message(), e.code().value());
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 		catch (...) {
-			LOG_CRITICAL(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
+			LOG_ERROR(s_logger, "An unexpected non negligible exception has been thrown in session #{}.", this->m_session_id);
 			throw shell::functional::callback_abort_exception(STATUS_CLOUD_FILE_UNSUCCESSFUL);
 		}
 
