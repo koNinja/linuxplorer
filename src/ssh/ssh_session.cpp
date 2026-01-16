@@ -38,7 +38,7 @@ namespace linuxplorer::ssh {
 			}
 		}
 		if (!internal::ssh_library_resource_manager::is_libssh2_initiated()) {
-			int errc = internal::ssh_library_resource_manager::is_libssh2_initiated();
+			int errc = internal::ssh_library_resource_manager::try_initiate_libssh2();
 			if (errc != 0) {
 				throw ssh_libssh2_exception(std::error_code(errc, libssh2_category(*this)), "Failed to initiate use of the libssh2 by the process.");
 			}
@@ -103,7 +103,16 @@ namespace linuxplorer::ssh {
 
 		this->m_username = username.data();
 
-		int result = libssh2_userauth_password(this->m_session->ptr(), charset_helper::convert_wide_to_multibyte(username).c_str(), charset_helper::convert_wide_to_multibyte(password).c_str());
+		auto username_mb = charset_helper::convert_wide_to_multibyte(username);
+		auto password_mb = charset_helper::convert_wide_to_multibyte(password);
+		int result = libssh2_userauth_password_ex(
+			this->m_session->ptr(),
+			username_mb.c_str(),
+			username_mb.size() * sizeof(char),
+			password_mb.c_str(),
+			password_mb.size() * sizeof(char),
+			nullptr
+		);
 		if (result != 0) {
 			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(*this)), "Failed to authenticate.");
 		}

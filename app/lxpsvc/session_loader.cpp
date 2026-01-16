@@ -12,51 +12,81 @@
 #include <shell/cloud_provider_exception.hpp>
 #include <shell/filesystem/cloud_provider_registrar.hpp>
 
+#include <util/config/profiles.hpp>
+
 #include <quill/LogMacros.h>
 
 #define GENERATE_CALLBACK_THIS(callback_type, callback)	shell::functional::specialized_cloud_provider_callback<callback_type>([this](const shell::functional::internal::typed_callback_aliases<callback_type>::callback_parameters& parameters) -> shell::functional::internal::typed_callback_aliases<callback_type>::operation_info { return callback(parameters); })
 
 namespace linuxplorer::app::lxpsvc {
+	void session::build_ssh_sftp_sessions(std::uint16_t port, std::wstring_view host, std::wstring_view username, std::wstring_view password) {
+		std::unique_lock ssh_lock(this->m_ssh_mutex);
+		std::unique_lock sftp_lock(this->m_sftp_mutex);
+
+		this->m_sftp_session.reset();
+		this->m_ssh_session.reset();
+
+		this->m_ssh_session.emplace(ssh::ssh_address(host), port);
+		LOG_INFO(s_logger, "The configuration loaded successfully in session #{}.", this->m_session_id);
+
+
+		LOG_INFO(s_logger, "Connecting to SSH server in session #{}.", this->m_session_id);
+		this->m_ssh_session->connect();
+		LOG_INFO(s_logger, "Connected to SSH server successfully in session #{}.", this->m_session_id);
+		
+		
+		LOG_INFO(s_logger,
+			"Authenticating to SSH server as '{}' in session #{}.", 
+			util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(username),
+			this->m_session_id
+		);
+		this->m_ssh_session->authenticate(username, password);
+		LOG_INFO(
+			s_logger,
+			"Successfully authenticated to SSH server as '{}' in session #{}.", 
+			util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(username),
+			this->m_session_id
+		);
+		
+		
+		LOG_INFO(s_logger, "Establishing the SFTP session in session #{}.", this->m_session_id);
+		this->m_sftp_session.emplace(this->m_ssh_session.value());
+		LOG_INFO(s_logger, "The SFTP session established successfully in session #{}.", this->m_session_id);
+		
+		::libssh2_keepalive_config(this->m_ssh_session->get_session(), true, s_keepalive_duration.count());
+		
+		ssh_lock.unlock();
+		sftp_lock.unlock();
+	}
+
 	void session::start() noexcept {
 		try {
 			LOG_INFO(s_logger, "Starting session #{}.", this->m_session_id);
 
+			this->m_death_event.reset(::CreateEventW(nullptr, true, false, nullptr));
+			if (!this->m_death_event) {
+				std::error_code ec(::GetLastError(), std::system_category());
+				LOG_CRITICAL(
+					s_logger,
+					"Failed to create a event to kill this session (#{}). (Win32: {}({}))",
+					this->m_session_id,
+					ec.message(),
+					ec.value()
+				);
+				return;
+			}
+
 			LOG_INFO(
 				s_logger,
 				"Loading the profile '{}' for session #{}.",
-				this->m_session_id, 
-				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(this->m_profile_name)
+				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(this->m_profile_name),
+				this->m_session_id
 			);
 			const auto& profile = util::config::profile_manager::get(this->m_profile_name);
 
-			this->m_ssh_session.emplace(ssh::ssh_address(profile.get_credential().get_host()), profile.get_port());
-			LOG_INFO(s_logger, "The configuration loaded successfully in session #{}.", this->m_session_id);
+			this->build_ssh_sftp_sessions(profile.get_port(), profile.get_credential().get_host(), profile.get_credential().get_username(), profile.get_credential().get_password());
 
-
-			LOG_INFO(s_logger, "Connecting to SSH server in session #{}.", this->m_session_id);
-
-			this->m_ssh_session->connect();
-			LOG_INFO(s_logger, "Connected to SSH server successfully in session #{}.", this->m_session_id);
-
-
-			LOG_INFO(s_logger,
-				"Authenticating to SSH server as '{}' in session #{}.", 
-				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(profile.get_credential().get_username()),
-				this->m_session_id
-			);
-			this->m_ssh_session->authenticate(profile.get_credential().get_username(), profile.get_credential().get_password());
-			LOG_INFO(
-				s_logger,
-				"Successfully authenticated to SSH server as '{}' in session #{}.", 
-				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(profile.get_credential().get_username()),
-				this->m_session_id
-			);
-
-
-			LOG_INFO(s_logger, "Establishing the SFTP session in session #{}.", this->m_session_id);
-			this->m_sftp_session.emplace(this->m_ssh_session.value());
-			LOG_INFO(s_logger, "The SFTP session established successfully in session #{}.", this->m_session_id);
-
+			this->m_watcher = std::thread([this]() { this->watch_ssh_sessions(); });
 
 			LOG_INFO(s_logger, "Starting cloud provider service in session #{}.", this->m_session_id);
 			this->m_syncroot_dir = profile.get_syncroot();
@@ -64,10 +94,13 @@ namespace linuxplorer::app::lxpsvc {
 
 			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_data, this->on_fetch_data));
 			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::fetch_placeholders, this->on_fetch_placeholders));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::cancel_fetching_data, this->on_cancel_fetch_data));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::notify_deletion, this->on_delete));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::notify_renaming, this->on_rename));
+			this->m_cloud_session->register_callback(GENERATE_CALLBACK_THIS(shell::functional::cloud_provider_callback_type::notify_renaming_completion, this->on_rename_completion));
 
 			this->m_cloud_session->connect();
 			LOG_INFO(s_logger, "The cloud provider service started successfully in session #{}.", this->m_session_id);
-
 
 			LOG_INFO(s_logger, "Session #{} has been started successfully.", this->m_session_id);
 			this->m_exit_code = this->main();
@@ -157,6 +190,9 @@ namespace linuxplorer::app::lxpsvc {
 	void session::stop() noexcept {
 		try {
 			LOG_INFO(s_logger, "Stopping session #{}...", this->m_session_id);
+
+			::SetEvent(this->m_death_event.get());
+			this->m_watcher->join();
 
 			if (this->m_ssh_session && this->m_ssh_session->get_state() == ssh::ssh_session_state::connected) {
 				this->m_ssh_session->disconnect();

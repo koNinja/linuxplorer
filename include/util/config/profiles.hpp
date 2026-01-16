@@ -59,7 +59,7 @@ namespace linuxplorer::util::config {
 		~credential() noexcept;
 	};
 
-	class LINUXPLORER_CONFIG_API profile {
+	class profile {
 	private:
 		std::wstring m_name;
 		credential m_credential;

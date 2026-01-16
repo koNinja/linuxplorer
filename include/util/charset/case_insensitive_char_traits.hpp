@@ -1,12 +1,14 @@
 #ifndef LINUXPLORER_CASE_INSENSITIVE_CHAR_TRAITS_HPP_
 #define LINUXPLORER_CASE_INSENSITIVE_CHAR_TRAITS_HPP_
 
+#include <locale>
 #include <string>
 
 namespace linuxplorer::util::charset {
 	template <class T>
 	class case_insensitive_char_traits : std::char_traits<T> {
 		using base_traits = std::char_traits<T>;
+		inline static std::locale _loc = std::locale("");
 	public:
 		using char_type = T;
 		using int_type = int;
@@ -20,32 +22,31 @@ namespace linuxplorer::util::charset {
 		}
 
 		static constexpr bool eq(char_type c1, char_type c2) noexcept {
-			return base_traits::eq(std::tolower(c1), std::tolower(c2));
+			return base_traits::eq(std::tolower(c1, _loc), std::tolower(c2, _loc));
 		}
 
 		static constexpr bool lt(char_type c1, char_type c2) noexcept {
-			return base_traits::lt(std::tolower(c1), std::tolower(c2));
+			return base_traits::lt(std::tolower(c1, _loc), std::tolower(c2, _loc));
 		}
 
 		static constexpr int compare(const char_type* s1, const char_type* s2, size_t n) {
 			auto order = std::lexicographical_compare_three_way(s1, s1 + n, s2, s2 + n,
 				[](char_type c1, char_type c2) -> std::weak_ordering {
-					return std::tolower(c1) <=> std::tolower(c2);
+					return std::tolower(c1, _loc) <=> std::tolower(c2, _loc);
 				});
-			return order == std::weak_ordering::equivalent ? 0 :
-				order == std::weak_ordering::greater ? 1 :
-				-1;
+			return order == std::weak_ordering::equivalent ? 0 : order == std::weak_ordering::greater ? 1 : -1;
 		}
 
 		static constexpr size_t length(const char_type* s) {
 			return base_traits::length(s);
 		}
 
-		static constexpr const char_type* find(const char_type* s, size_t n,
-			const char_type& a) {
-			return std::find_if(s, s + n, [a](char_type c) {
-				return std::tolower(c) == a;
-				});
+		static constexpr const char_type* find(const char_type* s, size_t n, const char_type& a) {
+			char_type la = std::tolower(a, _loc);
+			auto itr =  std::find_if(s, s + n, [a](char_type c) {
+				return std::tolower(c, _loc) == a;
+			});
+			return itr == s + n ? nullptr : itr;
 		}
 
 		static constexpr char_type* move(char_type* s1, const char_type* s2, size_t n) {

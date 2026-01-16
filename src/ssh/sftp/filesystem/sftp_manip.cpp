@@ -1,5 +1,6 @@
 #include <ssh/sftp/filesystem/sftp_manip.hpp>
 #include <ssh/sftp/io/sftpstream.hpp>
+#include <ssh/sftp/filesystem/sftp_entity.hpp>
 #include <ssh/ssh_exception.hpp>
 
 namespace linuxplorer::ssh::sftp::filesystem {
@@ -83,62 +84,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
-		std::filesystem::file_type type;
-		if (LIBSSH2_SFTP_S_ISLNK(attr.permissions)) {
-			type = std::filesystem::file_type::symlink;
-		}
-		else if (LIBSSH2_SFTP_S_ISREG(attr.permissions)) {
-			type = std::filesystem::file_type::regular;
-		}
-		else if (LIBSSH2_SFTP_S_ISDIR(attr.permissions)) {
-			type = std::filesystem::file_type::directory;
-		}
-		else if (LIBSSH2_SFTP_S_ISCHR(attr.permissions)) {
-			type = std::filesystem::file_type::character;
-		}
-		else if (LIBSSH2_SFTP_S_ISBLK(attr.permissions)) {
-			type = std::filesystem::file_type::block;
-		}
-		else if (LIBSSH2_SFTP_S_ISFIFO(attr.permissions)) {
-			type = std::filesystem::file_type::fifo;
-		}
-		else if (LIBSSH2_SFTP_S_ISSOCK(attr.permissions)) {
-			type = std::filesystem::file_type::socket;
-		}
-		else {
-			type = std::filesystem::file_type::unknown;
-		}
-
-		std::filesystem::perms perm = std::filesystem::perms::none;
-		if (attr.permissions & LIBSSH2_SFTP_S_IRUSR) {
-			perm |= std::filesystem::perms::owner_read;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IWUSR) {
-			perm |= std::filesystem::perms::owner_write;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IXUSR) {
-			perm |= std::filesystem::perms::owner_exec;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IRGRP) {
-			perm |= std::filesystem::perms::group_read;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IWGRP) {
-			perm |= std::filesystem::perms::group_write;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IXGRP) {
-			perm |= std::filesystem::perms::group_exec;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IROTH) {
-			perm |= std::filesystem::perms::others_read;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IWOTH) {
-			perm |= std::filesystem::perms::others_write;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IXOTH) {
-			perm |= std::filesystem::perms::others_exec;
-		}
-
-		return std::filesystem::file_status(type, perm);
+		return internal::status_flags_to_file_status(attr.permissions);
 	}
 
 	std::filesystem::file_status status(const sftp_handle& handle) {
@@ -148,62 +94,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get file attributes.");
 		}
 
-		std::filesystem::file_type type;
-		if (LIBSSH2_SFTP_S_ISLNK(attr.permissions)) {
-			type = std::filesystem::file_type::symlink;
-		}
-		else if (LIBSSH2_SFTP_S_ISREG(attr.permissions)) {
-			type = std::filesystem::file_type::regular;
-		}
-		else if (LIBSSH2_SFTP_S_ISDIR(attr.permissions)) {
-			type = std::filesystem::file_type::directory;
-		}
-		else if (LIBSSH2_SFTP_S_ISCHR(attr.permissions)) {
-			type = std::filesystem::file_type::character;
-		}
-		else if (LIBSSH2_SFTP_S_ISBLK(attr.permissions)) {
-			type = std::filesystem::file_type::block;
-		}
-		else if (LIBSSH2_SFTP_S_ISFIFO(attr.permissions)) {
-			type = std::filesystem::file_type::fifo;
-		}
-		else if (LIBSSH2_SFTP_S_ISSOCK(attr.permissions)) {
-			type = std::filesystem::file_type::socket;
-		}
-		else {
-			type = std::filesystem::file_type::unknown;
-		}
-
-		std::filesystem::perms perm = std::filesystem::perms::none;
-		if (attr.permissions & LIBSSH2_SFTP_S_IRUSR) {
-			perm |= std::filesystem::perms::owner_read;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IWUSR) {
-			perm |= std::filesystem::perms::owner_write;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IXUSR) {
-			perm |= std::filesystem::perms::owner_exec;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IRGRP) {
-			perm |= std::filesystem::perms::group_read;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IWGRP) {
-			perm |= std::filesystem::perms::group_write;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IXGRP) {
-			perm |= std::filesystem::perms::group_exec;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IROTH) {
-			perm |= std::filesystem::perms::others_read;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IWOTH) {
-			perm |= std::filesystem::perms::others_write;
-		}
-		if (attr.permissions & LIBSSH2_SFTP_S_IXOTH) {
-			perm |= std::filesystem::perms::others_exec;
-		}
-
-		return std::filesystem::file_status(type, perm);
+		return internal::status_flags_to_file_status(attr.permissions);
 	}
 
 	std::uintmax_t file_size(const sftp_session& session, const std::filesystem::path& path) {
@@ -276,6 +167,50 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		}
 	}
 
+	std::uintmax_t internal_remove_children_recursive(const sftp_session& session, const std::filesystem::path& path) {
+		std::uintmax_t count = 0;
+		std::vector<sftp::filesystem::directory_entry> entries;
+		for (const auto& entry : directory_iterator(session, path)) {
+			if (entry.path() == L"." || entry.path() == L"..") continue;
+			entries.push_back(entry);
+		}
+
+		for (const auto& entry : entries) {
+			auto entry_path = path;
+			entry_path.concat(L"/").concat(entry.path().wstring());
+
+			if (entry.status().type() == std::filesystem::file_type::directory) {
+				count += internal_remove_children_recursive(session, entry_path);
+				remove(session, entry_path);
+				count++;
+			}
+			else if (entry.status().type() == std::filesystem::file_type::regular) {
+				remove(session, entry_path);
+				count++;
+			}
+			else {
+				throw ssh_libssh2_sftp_exception(
+					std::error_code(static_cast<int>(std::errc::not_supported), std::generic_category()),
+					"Not supported file type encountered during recursive removal."
+				);
+			}
+		}
+
+		return count;
+	}
+
+	std::uintmax_t remove_all(const sftp_session& session, const std::filesystem::path& path) {
+		if (sftp::filesystem::status(session, path).type() == std::filesystem::file_type::directory) {
+			auto count = internal_remove_children_recursive(session, path);
+			sftp::filesystem::remove(session, path);
+			return ++count;
+		}
+		else {
+			sftp::filesystem::remove(session, path);
+			return 1;
+		}
+	}
+
 	std::filesystem::file_time_type last_write_time(const sftp_session& session, const std::filesystem::path& path) {
 		auto p = path.u8string();
 
@@ -285,9 +220,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
-		auto utc_lm = std::chrono::file_clock::from_utc(std::chrono::utc_clock::from_sys(std::chrono::system_clock::from_time_t(attr.mtime)));
-		
-		return std::chrono::time_point_cast<std::filesystem::file_time_type::duration>(utc_lm);
+		return unix_to_filetime(attr.mtime);
 	}
 
 	std::filesystem::file_time_type last_access_time(const sftp_session& session, const std::filesystem::path& path) {
@@ -299,8 +232,6 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			throw ssh_libssh2_sftp_exception(std::error_code(rc, libssh2_sftp_category()), "Failed to get status about an SFTP file.");
 		}
 
-		auto utc_la = std::chrono::file_clock::from_utc(std::chrono::utc_clock::from_sys(std::chrono::system_clock::from_time_t(attr.atime)));
-		
-		return std::chrono::time_point_cast<std::filesystem::file_time_type::duration>(utc_la);
+		return unix_to_filetime(attr.atime);
 	}
 }
