@@ -79,8 +79,8 @@ namespace linuxplorer::app::lxpsvc {
 			LOG_INFO(
 				s_logger,
 				"Loading the profile '{}' for session #{}.",
-				this->m_session_id, 
-				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(this->m_profile_name)
+				util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(this->m_profile_name),
+				this->m_session_id
 			);
 			const auto& profile = util::config::profile_manager::get(this->m_profile_name);
 
