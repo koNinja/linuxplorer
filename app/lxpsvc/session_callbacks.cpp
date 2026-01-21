@@ -280,6 +280,7 @@ namespace linuxplorer::app::lxpsvc {
 
 			lock.unlock();
 
+			/*
 			for (const auto& entity_on_disk : std::filesystem::directory_iterator(absolute_placeholder_path_str)) {
 				if (occupied_lower_filenames.contains(tolower_sys_localized(entity_on_disk.path().filename().wstring()))) continue;
 				std::filesystem::path path = absolute_placeholder_path_str;
@@ -288,6 +289,7 @@ namespace linuxplorer::app::lxpsvc {
 				LOG_INFO(s_logger, "Delete '{}' because the file does not exist in the server, in session #{}.", path.string(), this->m_session_id);
 				std::filesystem::remove_all(path);
 			}
+			*/
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
 			LOG_ERROR(s_logger, "Failed to enumerate directory entities of '{}', in session #{}.", chcvt::convert_wide_to_multibyte(absolute_query_dir_path_str), this->m_session_id);
@@ -361,7 +363,7 @@ namespace linuxplorer::app::lxpsvc {
 	void session::on_cancel_fetch_data(const shell::functional::cancel_fetch_data_callback_parameters& parameters) {
 		if (this->m_fetch_cancel_tokens.contains(parameters.get_native_info().FileId.QuadPart)) {
 			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
-			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart] = false;
+			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart] = true;
 			fetch_cancel_token_unique_lock.unlock();
 		}
 	}

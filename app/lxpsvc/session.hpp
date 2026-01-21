@@ -104,7 +104,7 @@ namespace linuxplorer::app::lxpsvc {
 		shell::functional::operation_info on_rename(const shell::functional::rename_callback_parameters& parameters);
 		void on_rename_completion(const shell::functional::rename_completion_callback_parameters& parameters);
 		
-		::USN on_change_read(const unique_nthandle& device, ::DWORDLONG journal_id, ::USN read_starts_at, std::span<std::byte> bytes_notify_info);
+		::USN on_change_read(const unique_nthandle& device, ::DWORDLONG journal_id, ::USN read_starts_at, std::optional<::USN> read_until, std::span<std::byte> bytes_notify_info);
 		void on_created_new(std::wstring_view client_path, std::wstring_view relative_client_path, std::wstring_view server_path);
 		void on_attribute_changed(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path);
 		void on_content_changed(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path);
