@@ -436,6 +436,12 @@ namespace linuxplorer::app::lxpsvc {
 			}
 			// Otherwise, delete it from the server.
 			else {
+				// Skip if the file doesn't exist on the server.
+				try { ssh::sftp::filesystem::status(this->m_sftp_session.value(), absolute_old_server_path); } 
+				catch (...) {
+					return {};
+				}
+				
 				ssh::sftp::filesystem::remove_all(this->m_sftp_session.value(), absolute_old_server_path);
 				LOG_INFO(
 					s_logger,
