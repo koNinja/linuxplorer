@@ -185,7 +185,6 @@ namespace linuxplorer::app::lxpsvc {
 			for (const auto& relative_query_entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session.value(), absolute_query_dir_path_str)) {
 				auto placeholder_name_str = relative_query_entity.path().filename().wstring();
 				
-				if (placeholder_name_str == L"." || placeholder_name_str == L"..") continue;
 				if (contains_invalid_ntfs_character(placeholder_name_str)) {
 					LOG_INFO(s_logger, "Skip '{}' because its name contains invalid characters in NTFS, in session #{}.", relative_query_entity.path().filename().string(), this->m_session_id);
 					skipped++;
