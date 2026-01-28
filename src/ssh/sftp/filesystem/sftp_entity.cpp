@@ -1,7 +1,6 @@
 #include <ssh/sftp/filesystem/sftp_entity.hpp>
 #include <ssh/sftp/filesystem/sftp_manip.hpp>
 #include <ssh/ssh_exception.hpp>
-#include <iostream>
 
 namespace linuxplorer::ssh::sftp::filesystem {
 	namespace internal {
@@ -103,59 +102,76 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		return this->m_last_access_time;
 	}
 
-	directory_iterator::directory_iterator() noexcept : m_pos(-1) {}
-
-	directory_iterator::directory_iterator(const sftp_session& session, const std::filesystem::path& path, std::filesystem::directory_options options) : m_pos(-1) {
-		auto handle = open(session, path, open_permissions::read);
-
-		int bytes_read;
-		// filename limit is 255 bytes in linux;
-		char8_t buffer[0xFF];
-		while (true) {
-			::LIBSSH2_SFTP_ATTRIBUTES attr;
-
-			bytes_read = ::libssh2_sftp_readdir_ex(handle.get_handle(), reinterpret_cast<char*>(buffer), sizeof(buffer), nullptr, 0, &attr);
-			if (bytes_read <= 0) break;
-
-			this->m_entities.push_back(directory_entry(
-				buffer,
-				attr.filesize,
-				internal::status_flags_to_file_status(attr.permissions),
-				unix_to_filetime(attr.atime),
-				unix_to_filetime(attr.mtime))
-			);
-		}
-		
-		if (bytes_read < 0) {
-			throw ssh_libssh2_sftp_exception(std::error_code(bytes_read, libssh2_sftp_category()), "Failed to read directory data.");
-		}
-
-		this->m_pos = 0;
+	internal::directory_iterator_context::directory_iterator_context(const sftp_session& session, const std::filesystem::path& path) : m_handle(open(session, path, open_permissions::read)), m_end_reached(false) {
+		this->next();	// Preload first entry
 	}
 
+	const directory_entry& internal::directory_iterator_context::current() const noexcept {
+		return this->m_current;
+	}
+
+	bool internal::directory_iterator_context::end_reached() const noexcept {
+		return this->m_end_reached;
+	}
+
+	void internal::directory_iterator_context::next() {
+		if (this->m_end_reached) {
+			return;
+		}
+
+		// filename limit is 255 bytes in linux;
+		char8_t buffer[0xFF];
+		
+		while (true) {
+			::LIBSSH2_SFTP_ATTRIBUTES attr{};
+			int bytes_read = ::libssh2_sftp_readdir_ex(this->m_handle.get_handle(), reinterpret_cast<char*>(buffer), sizeof(buffer), nullptr, 0, &attr);
+			if (bytes_read < 0) {
+				throw ssh_libssh2_sftp_exception(std::error_code(bytes_read, libssh2_sftp_category()), "Failed to read directory data.");
+			}
+			else if (bytes_read == 0) {
+				m_end_reached = true;
+				return;
+			}
+			else {}
+
+			std::filesystem::path path = std::u8string_view(buffer, bytes_read);
+
+			if (path.filename() != L"." && path.filename() != L"..") {
+				this->m_current = directory_entry(
+					path,
+					attr.filesize,
+					internal::status_flags_to_file_status(attr.permissions),
+					unix_to_filetime(attr.atime),
+					unix_to_filetime(attr.mtime)
+				);
+				break;
+			}
+		}
+	}
+
+	directory_iterator::directory_iterator(const sftp_session& session, const std::filesystem::path& path, std::filesystem::directory_options options) : m_context(std::make_shared<internal::directory_iterator_context>(session, path)) {}
+
 	const directory_iterator::value_type& directory_iterator::operator*() const noexcept {
-		return this->m_entities[this->m_pos];
+		return this->m_context->current();
 	}
 
 	const directory_iterator::value_type* directory_iterator::operator->() const noexcept {
-		return &this->m_entities[this->m_pos];
+		return &this->m_context->current();
 	}
 
-	directory_iterator& directory_iterator::operator++() noexcept {
-		this->m_pos += 1;
-		if (this->m_pos >= this->m_entities.size()) {
-			this->m_pos = -1;
+	directory_iterator& directory_iterator::operator++() {
+		this->m_context->next();
+		if (this->m_context->end_reached()) {
+			this->m_context.reset();
 		}
 		return *this;
 	}
 
 	bool directory_iterator::operator==(const directory_iterator& itr) const noexcept {
-		return this->m_pos == itr.m_pos;
+		return this->m_context == itr.m_context;
 	}
 
 	bool directory_iterator::operator!=(const directory_iterator& itr) const noexcept {
-		return this->m_pos != itr.m_pos;
+		return !(*this == itr);
 	}
-
-	directory_iterator::~directory_iterator() {}
 }

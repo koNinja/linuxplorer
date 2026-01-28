@@ -33,7 +33,9 @@ namespace linuxplorer::ssh::sftp {
 		struct sftp_session_delete {
 		public:
 			inline void operator()(internal_sftp_session_ptr_t* ptr) {
-				::libssh2_sftp_shutdown(ptr->ptr());
+				if (ptr) {
+					::libssh2_sftp_shutdown(ptr->ptr());
+				}
 				delete ptr;
 			}
 		};
@@ -64,7 +66,9 @@ namespace linuxplorer::ssh::sftp {
 		struct sftp_handle_delete {
 		public:
 			void operator()(internal_sftp_handle_ptr_t* ptr) {
-				::libssh2_sftp_close_handle(ptr->ptr());
+				if (ptr) {
+					::libssh2_sftp_close_handle(ptr->ptr());
+				}
 				delete ptr;
 			}
 		};
@@ -95,7 +99,7 @@ namespace linuxplorer::ssh::sftp {
 	public:
 		sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle);
 		sftp_handle(const sftp_handle&) = delete;
-		sftp_handle(sftp_handle&&) = default;
+		sftp_handle(sftp_handle&&) noexcept;
 		operator bool() const noexcept;
 
 		::LIBSSH2_SFTP_HANDLE* get_handle() const noexcept;

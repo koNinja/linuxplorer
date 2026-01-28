@@ -38,9 +38,13 @@ namespace linuxplorer::ssh::sftp {
 
 	sftp_handle::sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle) {
 		if (!handle) {
-			throw std::invalid_argument("null handle.");
+			throw ssh_invalid_operation_exception("null handle.");
 		}
 		this->m_handle = internal::unqiue_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
+	}
+
+	sftp_handle::sftp_handle(sftp_handle&& rhs) noexcept : m_handle(std::move(rhs.m_handle)) {
+		rhs.m_handle = nullptr;
 	}
 
 	sftp_handle::operator bool() const noexcept {
