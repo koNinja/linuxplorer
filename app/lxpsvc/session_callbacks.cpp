@@ -185,7 +185,6 @@ namespace linuxplorer::app::lxpsvc {
 			for (const auto& relative_query_entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session.value(), absolute_query_dir_path_str)) {
 				auto placeholder_name_str = relative_query_entity.path().filename().wstring();
 				
-				if (placeholder_name_str == L"." || placeholder_name_str == L"..") continue;
 				if (contains_invalid_ntfs_character(placeholder_name_str)) {
 					LOG_INFO(s_logger, "Skip '{}' because its name contains invalid characters in NTFS, in session #{}.", relative_query_entity.path().filename().string(), this->m_session_id);
 					skipped++;
@@ -280,6 +279,7 @@ namespace linuxplorer::app::lxpsvc {
 
 			lock.unlock();
 
+			/*
 			for (const auto& entity_on_disk : std::filesystem::directory_iterator(absolute_placeholder_path_str)) {
 				if (occupied_lower_filenames.contains(tolower_sys_localized(entity_on_disk.path().filename().wstring()))) continue;
 				std::filesystem::path path = absolute_placeholder_path_str;
@@ -288,6 +288,7 @@ namespace linuxplorer::app::lxpsvc {
 				LOG_INFO(s_logger, "Delete '{}' because the file does not exist in the server, in session #{}.", path.string(), this->m_session_id);
 				std::filesystem::remove_all(path);
 			}
+			*/
 		}
 		catch (const ssh::ssh_libssh2_exception& e) {
 			LOG_ERROR(s_logger, "Failed to enumerate directory entities of '{}', in session #{}.", chcvt::convert_wide_to_multibyte(absolute_query_dir_path_str), this->m_session_id);
@@ -361,7 +362,7 @@ namespace linuxplorer::app::lxpsvc {
 	void session::on_cancel_fetch_data(const shell::functional::cancel_fetch_data_callback_parameters& parameters) {
 		if (this->m_fetch_cancel_tokens.contains(parameters.get_native_info().FileId.QuadPart)) {
 			std::unique_lock fetch_cancel_token_unique_lock(this->m_fetch_cancel_tokens_mutex);
-			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart] = false;
+			this->m_fetch_cancel_tokens[parameters.get_native_info().FileId.QuadPart] = true;
 			fetch_cancel_token_unique_lock.unlock();
 		}
 	}
@@ -434,6 +435,12 @@ namespace linuxplorer::app::lxpsvc {
 			}
 			// Otherwise, delete it from the server.
 			else {
+				// Skip if the file doesn't exist on the server.
+				try { ssh::sftp::filesystem::status(this->m_sftp_session.value(), absolute_old_server_path); } 
+				catch (...) {
+					return {};
+				}
+				
 				ssh::sftp::filesystem::remove_all(this->m_sftp_session.value(), absolute_old_server_path);
 				LOG_INFO(
 					s_logger,

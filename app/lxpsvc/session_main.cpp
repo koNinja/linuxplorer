@@ -158,12 +158,36 @@ namespace linuxplorer::app::lxpsvc {
 					continue;
 				}
 
-				// if (bytes_notify_info_returned <= 0) continue;
+				if (bytes_notify_info_returned <= 0) {
+					LOG_ERROR(s_logger, "File changes were detected, but it is impossible to resolve the path, session #{}.", this->m_session_id);
+					continue;
+				}
+
+				std::optional<::USN> usn_read_until = std::nullopt;
+
+				succeeded = ::DeviceIoControl(
+					volume.get(),
+					FSCTL_QUERY_USN_JOURNAL,
+					nullptr,
+					0,
+					&journal,
+					sizeof(journal),
+					&bytes_io_control_returned,
+					nullptr
+				);
+				if (succeeded) {
+					usn_read_until = journal.NextUsn;
+				}
+				else {
+					std::error_code ec(::GetLastError(), std::system_category());
+					LOG_WARNING(s_logger, "Failed to query a USN journal. There is a possibility that some file changes are missed because the USN journal will be read through. In session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
+				}
 
 				usn_read_starts_at = this->on_change_read(
 					volume,
 					journal.UsnJournalID,
 					usn_read_starts_at,
+					usn_read_until,
 					std::span(bytes_notify_info.get(), bytes_notify_info_returned)
 				);
 

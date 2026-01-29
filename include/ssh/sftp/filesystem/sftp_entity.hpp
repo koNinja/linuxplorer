@@ -5,7 +5,6 @@
 #include <ssh/ssh_session.hpp>
 #include <ssh/sftp/sftp_session.hpp>
 #include <filesystem>
-#include <vector>
 
 namespace linuxplorer::ssh::sftp::filesystem {
 	namespace internal {
@@ -46,7 +45,29 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		virtual ~directory_entry() = default;
 	};
 
+	namespace internal {
+		struct LINUXPLORER_SSH_API directory_iterator_context {
+		private:
+			sftp_handle m_handle;
+			directory_entry m_current;
+			bool m_end_reached;
+		public:
+			directory_iterator_context(const sftp_session& session, const std::filesystem::path& path);
+			directory_iterator_context(const directory_iterator_context&) = delete;
+			directory_iterator_context(directory_iterator_context&&) = default;
+
+			void next();
+
+			bool end_reached() const noexcept;
+			const directory_entry& current() const noexcept;
+
+			virtual ~directory_iterator_context() = default;
+		};
+	}
+
 	class LINUXPLORER_SSH_API directory_iterator {
+	private:
+		std::shared_ptr<internal::directory_iterator_context> m_context;
 	public:
 		using iterator_category = std::input_iterator_tag;
 		using value_type = directory_entry;
@@ -54,29 +75,26 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		using pointer = const directory_entry*;
 		using reference = const directory_entry&;
 		using pos_type = std::streampos;
-
-		directory_iterator() noexcept;
+	
+		directory_iterator() noexcept = default;
 		explicit directory_iterator(const sftp_session& session, const std::filesystem::path& path, std::filesystem::directory_options options = std::filesystem::directory_options::none);
-		directory_iterator(const directory_iterator&) noexcept = default;
-		directory_iterator(directory_iterator&& rhs) noexcept = default;
+		directory_iterator(const directory_iterator& lhs) = default;
+		directory_iterator(directory_iterator&& rhs) = default;
 
 		const value_type& operator*() const noexcept;
 		const value_type* operator->() const noexcept;
-		directory_iterator& operator++() noexcept;
+		directory_iterator& operator++();
 		bool operator==(const directory_iterator& itr) const noexcept;
 		bool operator!=(const directory_iterator& itr) const noexcept;
 
-		virtual ~directory_iterator();
-	private:
-		std::streampos m_pos;
-		std::vector<value_type> m_entities;
+		virtual ~directory_iterator() = default;
 	};
 
 	inline directory_iterator begin(directory_iterator itr) noexcept {
 		return itr;
 	}
 
-	inline directory_iterator end(directory_iterator itr) noexcept {
+	inline directory_iterator end(directory_iterator) noexcept {
 		return directory_iterator{};
 	}
 }

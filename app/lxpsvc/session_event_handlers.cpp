@@ -54,6 +54,7 @@ namespace linuxplorer::app::lxpsvc {
 		const session::unique_nthandle& device,
 		::DWORDLONG journal_id,
 		::USN read_starts_at,
+		std::optional<::USN> read_until,
 		std::span<std::byte> bytes_notify_info
 	) {
 		constexpr std::uint32_t reason_mask = USN_REASON_BASIC_INFO_CHANGE | USN_REASON_DATA_OVERWRITE | USN_REASON_DATA_EXTEND | USN_REASON_FILE_CREATE | USN_REASON_DATA_TRUNCATION | USN_REASON_RENAME_NEW_NAME | USN_REASON_RENAME_OLD_NAME | USN_REASON_FILE_DELETE;
@@ -69,40 +70,12 @@ namespace linuxplorer::app::lxpsvc {
 		read_data.ReasonMask = reason_mask;
 		read_data.UsnJournalID = journal_id;
 
-		constexpr std::size_t supported_journal_records_at_once = 1000;
-
-		// Each FileName field is null when FSCTL_READ_UNPRIVILEGED_USN_JOURNAL
-		constexpr std::size_t bytes_journal_buffer_size = sizeof(::USN) + supported_journal_records_at_once * sizeof(usn_record_t);
-		static auto bytes_journal = std::make_unique<std::byte[]>(bytes_journal_buffer_size);
-
-		::DWORD bytes_returned;
-
-		bool succeeded = ::DeviceIoControl(
-			device.get(),
-			FSCTL_READ_UNPRIVILEGED_USN_JOURNAL,
-			&read_data,
-			sizeof(read_data),
-			bytes_journal.get(),
-			bytes_journal_buffer_size * sizeof(std::byte),
-			&bytes_returned, 
-			nullptr
-		);
-		if (!succeeded || bytes_returned < 8) {
-			std::error_code ec(::GetLastError(), std::system_category());
-			LOG_CRITICAL(s_logger, "Failed to read USN journal records in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
-			return 1;
-		}
-
-		std::unordered_map<::FILE_ID_128, std::wstring> relative_changed_file_paths;
-
-		auto compare = [](std::wstring_view l, std::wstring_view r) -> int {
-			if (l.length() == r.length()) return util::charset::case_insensitive_char_traits<wchar_t>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
-			else return 1;
-		};
-
+		bool succeeded;
+		
 		std::size_t bytes_notify_info_entry_offset = 0;
 		std::size_t bytes_notify_info_entry_diff = 0;
 
+		std::unordered_map<::FILE_ID_128, std::wstring> relative_changed_file_paths;
 		do {
 			auto info = reinterpret_cast<::FILE_NOTIFY_INFORMATION*>(&bytes_notify_info[bytes_notify_info_entry_offset]);
 
@@ -141,89 +114,128 @@ namespace linuxplorer::app::lxpsvc {
 			relative_changed_file_paths[frn_info.FileId] = abs_path;
 		} while (bytes_notify_info_entry_diff > 0);
 
-		std::size_t total_bytes_read = sizeof(::USN);
-		while (total_bytes_read < bytes_returned) try {
-			auto journal = reinterpret_cast<usn_record_t*>(bytes_journal.get() + total_bytes_read);
-			total_bytes_read += journal->RecordLength;
+		constexpr std::size_t supported_journal_records_at_once = 800;
 
-			if (!relative_changed_file_paths.contains(journal->FileReferenceNumber)) continue;
+		// Each FileName field is null when FSCTL_READ_UNPRIVILEGED_USN_JOURNAL
+		constexpr std::size_t bytes_journal_buffer_size = sizeof(::USN) + supported_journal_records_at_once * sizeof(usn_record_t);
+		constexpr std::size_t bytes_journal_least_size = sizeof(::USN);
+		auto bytes_journal = std::make_unique<std::byte[]>(bytes_journal_buffer_size);
 
-			std::wstring absolute_client_path = relative_changed_file_paths[journal->FileReferenceNumber];
+		::USN next_read_starts_at = read_starts_at;
+		::USN usn_read_until = read_until.has_value() ? *read_until : std::numeric_limits<::USN>::max();
 
-			auto relative_client_path = this->relative_path_from_syncroot(absolute_client_path);
-			auto server_path = this->server_path_from_relative_path(relative_client_path);
-
-			if (has_any(journal->Reason, USN_REASON_FILE_CREATE)) {
-				this->on_created_new(absolute_client_path, relative_client_path, server_path);
-			}
-
-			if (has_any(journal->Reason, USN_REASON_DATA_OVERWRITE, USN_REASON_DATA_EXTEND, USN_REASON_DATA_TRUNCATION)) {
-				this->on_content_changed(absolute_client_path, relative_client_path, server_path);
-			}
-
-			if (equals_to(journal->Reason, USN_REASON_BASIC_INFO_CHANGE)) {
-				this->on_attribute_changed(absolute_client_path, relative_client_path, server_path);
-			}
-
-			if (has_any(journal->Reason, USN_REASON_RENAME_NEW_NAME) && !shell::filesystem::cloud_filter_placeholder::is_placeholder(this->m_cloud_session.value(), relative_client_path)) {
-				this->on_moved_from_external(absolute_client_path, relative_client_path, server_path);
-			}
-
-			if (::GetFileAttributesW(absolute_client_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) continue;
-
-			std::unique_lock<std::mutex> lf_lock(this->m_placeholder_last_fetched_mutex);
-			if (
-				!this->m_placeholder_last_fetched.contains(journal->ParentFileReferenceNumber) ||
-				std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()) - this->m_placeholder_last_fetched[journal->ParentFileReferenceNumber] > s_refetch_period
-			) {
-				std::wstring relative_parent_path = this->relative_path_from_syncroot(this->extract_parent_path(absolute_client_path));
-				shell::filesystem::directory_placeholder placeholder(this->m_cloud_session.value(), relative_parent_path);
-				placeholder.set_enumeration_enabled(true);
-				LOG_INFO(s_logger, "Enable entry enumeration for the directory '{}' in session #{}.", chcvt::convert_wide_to_multibyte(this->build_absolute_path_from(relative_parent_path)), this->m_session_id);
-				placeholder.flush();
-			}
-			lf_lock.unlock();
-		}
-		catch (const ssh::ssh_libssh2_sftp_exception& e) {
-			LOG_ERROR(
-				s_logger,
-				"SFTP operations failed: {}, in session #{}. (libssh2: {}({}))",
-				e.what(),
-				this->m_session_id,
-				e.code().message(),
-				e.code().value()
+		::DWORD bytes_returned;
+		do {
+			succeeded = ::DeviceIoControl(
+				device.get(),
+				FSCTL_READ_UNPRIVILEGED_USN_JOURNAL,
+				&read_data,
+				sizeof(read_data),
+				bytes_journal.get(),
+				bytes_journal_buffer_size * sizeof(std::byte),
+				&bytes_returned, 
+				nullptr
 			);
-			continue;
-		}
-		catch (const shell::cloud_provider_system_error& e) {
-			LOG_ERROR(
-				s_logger,
-				"Placeholder operations failed: {}, in session #{}. (libssh2: {}({}))",
-				e.what(),
-				this->m_session_id,
-				e.code().message(),
-				e.code().value()
-			);
-			continue;
-		}
+			if (!succeeded || bytes_returned < bytes_journal_least_size) {
+				std::error_code ec(::GetLastError(), std::system_category());
+				LOG_CRITICAL(s_logger, "Failed to read USN journal records in session #{} (From Win32: {}({}))", this->m_session_id, ec.message(), ec.value());
+				return 1;
+			}
+			else if (bytes_returned == bytes_journal_least_size) continue;
+			else {}
+
+			std::size_t total_bytes_read = sizeof(::USN);
+			while (total_bytes_read < bytes_returned) try {
+				auto journal = reinterpret_cast<usn_record_t*>(bytes_journal.get() + total_bytes_read);
+				total_bytes_read += journal->RecordLength;
+
+				if (!relative_changed_file_paths.contains(journal->FileReferenceNumber)) {
+					continue;
+				}
+
+				std::wstring absolute_client_path = relative_changed_file_paths[journal->FileReferenceNumber];
+
+				auto relative_client_path = this->relative_path_from_syncroot(absolute_client_path);
+				auto server_path = this->server_path_from_relative_path(relative_client_path);
+
+				if (has_any(journal->Reason, USN_REASON_FILE_CREATE)) {
+					this->on_created_new(absolute_client_path, relative_client_path, server_path);
+				}
+
+				if (has_any(journal->Reason, USN_REASON_DATA_OVERWRITE, USN_REASON_DATA_EXTEND, USN_REASON_DATA_TRUNCATION)) {
+					this->on_content_changed(absolute_client_path, relative_client_path, server_path);
+				}
+
+				if (equals_to(journal->Reason, USN_REASON_BASIC_INFO_CHANGE)) {
+					this->on_attribute_changed(absolute_client_path, relative_client_path, server_path);
+				}
+
+				if (has_any(journal->Reason, USN_REASON_RENAME_NEW_NAME) && !shell::filesystem::cloud_filter_placeholder::is_placeholder(this->m_cloud_session.value(), relative_client_path)) {
+					this->on_moved_from_external(absolute_client_path, relative_client_path, server_path);
+				}
+
+				if (::GetFileAttributesW(absolute_client_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) continue;
+
+				std::unique_lock<std::mutex> lf_lock(this->m_placeholder_last_fetched_mutex);
+				if (
+					!this->m_placeholder_last_fetched.contains(journal->ParentFileReferenceNumber) ||
+					std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()) - this->m_placeholder_last_fetched[journal->ParentFileReferenceNumber] > s_refetch_period
+				) {
+					std::wstring relative_parent_path = this->relative_path_from_syncroot(this->extract_parent_path(absolute_client_path));
+					shell::filesystem::directory_placeholder placeholder(this->m_cloud_session.value(), relative_parent_path);
+					placeholder.set_enumeration_enabled(true);
+					LOG_INFO(s_logger, "Enable entry enumeration for the directory '{}' in session #{}.", chcvt::convert_wide_to_multibyte(this->build_absolute_path_from(relative_parent_path)), this->m_session_id);
+					placeholder.flush();
+					this->m_placeholder_last_fetched[journal->ParentFileReferenceNumber] = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now());
+				}
+
+				lf_lock.unlock();
+			}
+			catch (const ssh::ssh_libssh2_sftp_exception& e) {
+				LOG_ERROR(
+					s_logger,
+					"SFTP operations failed: {}, in session #{}. (libssh2: {}({}))",
+					e.what(),
+					this->m_session_id,
+					e.code().message(),
+					e.code().value()
+				);
+				continue;
+			}
+			catch (const shell::cloud_provider_system_error& e) {
+				LOG_ERROR(
+					s_logger,
+					"Placeholder operations failed: {}, in session #{}. (Win32: {}({}))",
+					e.what(),
+					this->m_session_id,
+					e.code().message(),
+					e.code().value()
+				);
+				continue;
+			}
+
+			read_data.StartUsn = next_read_starts_at = *reinterpret_cast<::USN*>(bytes_journal.get());
+		} while (next_read_starts_at <= usn_read_until && bytes_returned > bytes_journal_least_size);
 	
-		return *reinterpret_cast<::USN*>(bytes_journal.get());
+		return std::min(next_read_starts_at, usn_read_until);
 	}
 
 	void session::on_created_new(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path) {
 		try {
-			LOG_INFO(s_logger, "Detected creation of the file '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
-
 			auto lock = std::unique_lock(this->m_sftp_mutex);
 			
 			if (shell::filesystem::cloud_filter_placeholder::is_placeholder(this->m_cloud_session.value(), relative_client_path)) {
+				/*
 				LOG_INFO(
 					s_logger,
 					"Ignore placeholder creation by the callback in session #{}.",
 					this->m_session_id
 				);
+				*/
 				return;
 			}
+
+			LOG_INFO(s_logger, "Detected creation of the file '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
 
 			std::span<const std::byte> identity(s_dummy_blob, s_dummy_blob_length);
 			auto placeholder = shell::filesystem::cloud_filter_placeholder::transform(this->m_cloud_session.value(), relative_client_path, identity);
@@ -257,19 +269,17 @@ namespace linuxplorer::app::lxpsvc {
 
 	void session::on_attribute_changed(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path) {
 		try {
-			LOG_INFO(s_logger, "Detected attribute changes to '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
-
 			shell::filesystem::cloud_filter_placeholder placeholder(this->m_cloud_session.value(), relative_client_path);
-
+			
 			if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_UNPINNED) {
 				placeholder.set_pin_state(::CF_PIN_STATE::CF_PIN_STATE_UNSPECIFIED);
 
 				if (placeholder.get_type() == shell::filesystem::placeholder_type::file) {
+					LOG_INFO(s_logger, "Detected attribute changes to '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
 					shell::filesystem::file_placeholder file_ph(std::move(placeholder));
 					try {
 						file_ph.dehydrate();
 						file_ph.set_marked_in_sync(true);
-						file_ph.flush();
 						file_ph.flush();
 
 						LOG_INFO(
@@ -293,12 +303,14 @@ namespace linuxplorer::app::lxpsvc {
 					
 				}
 				else {
+					/*
 					LOG_INFO(
 						s_logger,
 						"Nothing to do for attribute changes to '{}' in session #{}.",
 						chcvt::convert_wide_to_multibyte(server_path),
 						this->m_session_id
 					);
+					*/
 				}
 			}
 			/*
@@ -309,6 +321,8 @@ namespace linuxplorer::app::lxpsvc {
 			// if 'always keep on this device' is selected:
 			else if (placeholder.get_pin_state() == ::CF_PIN_STATE::CF_PIN_STATE_PINNED) {
 				if (placeholder.get_type() == shell::filesystem::placeholder_type::file) {
+					LOG_INFO(s_logger, "Detected attribute changes to '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
+
 					shell::filesystem::file_placeholder file_ph(std::move(placeholder));
 					file_ph.hydrate();
 					file_ph.set_marked_in_sync(true);
@@ -322,21 +336,25 @@ namespace linuxplorer::app::lxpsvc {
 					);
 				}
 				else {
+					/*
 					LOG_INFO(
 						s_logger,
 						"Nothing to do for attribute changes to '{}' in session #{}.",
 						chcvt::convert_wide_to_multibyte(server_path),
 						this->m_session_id
 					);
+					*/
 				}
 			}
 			else {
+				/*
 				LOG_INFO(
 					s_logger,
 					"Nothing to do for attribute changes to '{}' in session #{}.",
 					chcvt::convert_wide_to_multibyte(server_path),
 					this->m_session_id
 				);
+				*/
 			}
 		}
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
@@ -363,25 +381,25 @@ namespace linuxplorer::app::lxpsvc {
 
 	void session::on_content_changed(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path) {
 		try {
-			LOG_INFO(s_logger, "Detected content changes to '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
-			
 			std::wstring absolute_src_path(absolute_client_path);
 			shell::filesystem::cloud_filter_placeholder placeholder(this->m_cloud_session.value(), relative_client_path);
-
+			
 			if (placeholder.is_marked_in_sync()) {
-				LOG_INFO(s_logger, "Ignore changes of the file '{}' because the file is already synchronized, in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				//LOG_INFO(s_logger, "Ignore changes of the file '{}' because the file is already synchronized, in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 				return;
 			}
-
+			
 			if (::GetFileAttributesW(absolute_src_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) {
 				if (!placeholder.is_marked_in_sync()) {
 					placeholder.set_marked_in_sync(true);
 					placeholder.flush();
 				}
-				LOG_INFO(s_logger, "The changed object '{}' is a directory. Ignore the change in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
+				//LOG_INFO(s_logger, "The changed object '{}' is a directory. Ignore the change in session #{}.", chcvt::convert_wide_to_multibyte(absolute_src_path), this->m_session_id);
 				return;
 			}
 
+			LOG_INFO(s_logger, "Detected content changes to '{}' in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
+			
 			auto lock = std::unique_lock(this->m_sftp_mutex);
 
 			std::ifstream ifs(absolute_src_path, std::ios::binary);
@@ -502,6 +520,7 @@ namespace linuxplorer::app::lxpsvc {
 			if (entry.is_directory()) {
 				shell::filesystem::directory_placeholder dir_ph(this->m_cloud_session.value(), relative_entity_path.wstring());
 				dir_ph.set_enumeration_enabled(false);
+				dir_ph.set_marked_in_sync(true);
 				dir_ph.flush();
 				internal_transform_children_recursive(entry.path(), relative_entity_path, server_entity_path);
 			}
@@ -510,13 +529,14 @@ namespace linuxplorer::app::lxpsvc {
 
 	void session::on_moved_from_external(std::wstring_view absolute_client_path, std::wstring_view relative_client_path, std::wstring_view server_path) {
 		try {
-			LOG_INFO(s_logger, "Detected external file '{}' into sync tree in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
+			LOG_INFO(s_logger, "Detected external file '{}' moved into sync tree in session #{}.", chcvt::convert_wide_to_multibyte(absolute_client_path), this->m_session_id);
 
 			this->on_created_new(absolute_client_path, relative_client_path, server_path);
 			this->on_content_changed(absolute_client_path, relative_client_path, server_path);
 			if (::GetFileAttributesW(std::wstring(absolute_client_path).c_str()) & FILE_ATTRIBUTE_DIRECTORY) {
 				shell::filesystem::directory_placeholder dir_ph(this->m_cloud_session.value(), relative_client_path);
 				dir_ph.set_enumeration_enabled(false);
+				dir_ph.set_marked_in_sync(true);
 				dir_ph.flush();
 				this->internal_transform_children_recursive(absolute_client_path, relative_client_path, server_path);
 			}
