@@ -44,14 +44,24 @@ namespace linuxplorer::shell::filesystem {
 		void close_handle();
 		void open_handle();
 	public:
+		cloud_filter_placeholder(std::wstring_view absolute_path);
+		[[deprecated("This constructor may reduce availability due to the strict requirement of the 1st argument.")]]
 		cloud_filter_placeholder(const cloud_provider_session& session, std::wstring_view relative_path);
 		cloud_filter_placeholder(const cloud_filter_placeholder&) = delete;
 		cloud_filter_placeholder(cloud_filter_placeholder&& rhs);
 
+		[[deprecated("This method may reduce availability due to the strict requirement of the 1st argument.")]]
 		static cloud_filter_placeholder create(const cloud_provider_session& session, const placeholder_creation_info& metadata);
+		static cloud_filter_placeholder create(std::wstring_view syncroot_path, const placeholder_creation_info& metadata);
+		[[deprecated("This method may reduce availability due to the strict requirement of the 1st argument.")]]
 		static cloud_filter_placeholder transform(const cloud_provider_session& session, std::wstring_view relative_path, std::span<const std::byte> identity);
+		static cloud_filter_placeholder transform(std::wstring_view absolute_path, std::span<const std::byte> identity);
+		[[deprecated("This method may reduce availability due to the strict requirement of the 1st argument.")]]
 		static void revert(const cloud_provider_session& session, cloud_filter_placeholder&& placeholder);
+		static void revert(cloud_filter_placeholder&& placeholder);
+		[[deprecated("This method may reduce availability due to the strict requirement of the 1st argument.")]]
 		static bool is_placeholder(const cloud_provider_session& session, std::wstring_view relative_path);
+		static bool is_placeholder(std::wstring_view absolute_path);
 
 		virtual ~cloud_filter_placeholder();
 
@@ -82,6 +92,8 @@ namespace linuxplorer::shell::filesystem {
 		virtual void internal_secondary_fetch() override;
 		virtual void internal_secondary_flush() const override;
 	public:
+		file_placeholder(std::wstring_view absolute_path);
+		[[deprecated("This constructor may reduce availability due to the strict requirement of the 1st argument.")]]
 		file_placeholder(const cloud_provider_session& session, std::wstring_view relative_path);
 		file_placeholder(const file_placeholder&) = delete;
 		file_placeholder(file_placeholder&& rhs);
@@ -104,6 +116,8 @@ namespace linuxplorer::shell::filesystem {
 	protected:
 		virtual void internal_secondary_flush() const override;
 	public:
+		directory_placeholder(std::wstring_view absolute_path);
+		[[deprecated("This constructor may reduce availability due to the strict requirement of the 1st argument.")]]
 		directory_placeholder(const cloud_provider_session& session, std::wstring_view relative_path);
 		directory_placeholder(const directory_placeholder&) = delete;
 		directory_placeholder(directory_placeholder&& rhs);

@@ -102,7 +102,11 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		return this->m_last_access_time;
 	}
 
-	internal::directory_iterator_context::directory_iterator_context(const sftp_session& session, const std::filesystem::path& path) : m_handle(open(session, path, open_permissions::read)), m_end_reached(false) {
+	internal::directory_iterator_context::directory_iterator_context(const sftp_session& session, const std::filesystem::path& path) : 
+		m_handle(open(session, path, open_permissions::read)),
+		m_end_reached(false),
+		m_path(path)
+	{
 		this->next();	// Preload first entry
 	}
 
@@ -134,11 +138,12 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			}
 			else {}
 
-			std::filesystem::path path = std::u8string_view(buffer, bytes_read);
-
-			if (path.filename() != L"." && path.filename() != L"..") {
+			std::filesystem::path p = std::u8string_view(buffer, bytes_read);
+			
+			if (p.filename() != L"." && p.filename() != L"..") {
 				this->m_current = directory_entry(
-					path,
+					// libssh2_sftp_readdir_ex returns filename only.
+					this->m_path / p,
 					attr.filesize,
 					internal::status_flags_to_file_status(attr.permissions),
 					unix_to_filetime(attr.atime),

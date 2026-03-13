@@ -1,8 +1,14 @@
 #ifndef LINUXPLORER_CHUNKED_CALLBACK_GENERATOR_HPP_
 #define LINUXPLORER_CHUNKED_CALLBACK_GENERATOR_HPP_
 
-#include <shell/shellfwd.hpp>
+#ifdef _HAS_CXX23
+#include <generator>
+namespace linuxplorer::shell::models {
+	template <class T>
+	using chunked_callback_generator = std::generator<T>;
+}
 
+#else
 #include <coroutine>
 #include <exception>
 #include <iterator>
@@ -58,7 +64,7 @@ namespace linuxplorer::shell::models {
 
             iterator() = default;
             explicit iterator(std::coroutine_handle<promise_type> coro) noexcept : m_coro(coro) {}
-			explicit iterator(iterator&& rhs) noexcept : m_coro(std::move(rhs)) {}
+			explicit iterator(iterator&& rhs) noexcept : m_coro(std::move(rhs.m_coro)) {}
 
             iterator& operator++() {
                 this->m_coro.resume();
@@ -128,4 +134,5 @@ namespace linuxplorer::shell::models {
 	};
 }
 
+#endif // _HAS_CXX23
 #endif // LINUXPLORER_CHUNKED_CALLBACK_GENERATPR_HPP_
