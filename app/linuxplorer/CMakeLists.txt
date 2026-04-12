@@ -19,7 +19,8 @@ target_link_libraries(
 	linuxplorer::util::config
 	linuxplorer::ssh
 	linuxplorer::shell
-	Boost::program_options shlwapi
+	Boost::program_options
+	shlwapi
 )
 install(TARGETS ${LINUXPLORER_APP_MAIN_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
