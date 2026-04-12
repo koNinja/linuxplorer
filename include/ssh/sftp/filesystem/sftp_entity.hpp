@@ -51,6 +51,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			sftp_handle m_handle;
 			directory_entry m_current;
 			bool m_end_reached;
+			std::filesystem::path m_path;
 		public:
 			directory_iterator_context(const sftp_session& session, const std::filesystem::path& path);
 			directory_iterator_context(const directory_iterator_context&) = delete;
@@ -75,8 +76,8 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		using pointer = const directory_entry*;
 		using reference = const directory_entry&;
 		using pos_type = std::streampos;
-	
-		directory_iterator() noexcept = default;
+
+		directory_iterator() noexcept;
 		explicit directory_iterator(const sftp_session& session, const std::filesystem::path& path, std::filesystem::directory_options options = std::filesystem::directory_options::none);
 		directory_iterator(const directory_iterator& lhs) = default;
 		directory_iterator(directory_iterator&& rhs) = default;

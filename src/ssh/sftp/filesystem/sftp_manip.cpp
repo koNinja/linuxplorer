@@ -176,16 +176,13 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		}
 
 		for (const auto& entry : entries) {
-			auto entry_path = path;
-			entry_path.concat(L"/").concat(entry.path().wstring());
-
 			if (entry.status().type() == std::filesystem::file_type::directory) {
-				count += internal_remove_children_recursive(session, entry_path);
-				remove(session, entry_path);
+				count += internal_remove_children_recursive(session, entry.path());
+				remove(session, entry.path());
 				count++;
 			}
 			else if (entry.status().type() == std::filesystem::file_type::regular) {
-				remove(session, entry_path);
+				remove(session, entry.path());
 				count++;
 			}
 			else {
@@ -233,5 +230,14 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		}
 
 		return unix_to_filetime(attr.atime);
+	}
+
+	bool exists(const sftp_session& session, const std::filesystem::path& path) {
+		auto p = path.u8string();
+
+		::LIBSSH2_SFTP_ATTRIBUTES attr{};
+		int rc = ::libssh2_sftp_stat_ex(session.get_session(), reinterpret_cast<const char*>(p.c_str()), p.length() * sizeof(char8_t), LIBSSH2_SFTP_STAT, &attr);
+		
+		return rc >= 0;
 	}
 }

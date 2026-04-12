@@ -18,7 +18,7 @@
 namespace linuxplorer::util::config {
 	startup_config::startup_config() {}
 
-	long startup_config::create_link_without_co_initialization(const std::wstring& src, const std::wstring& link) noexcept {
+	long startup_config::create_link_without_co_initialization(const std::filesystem::path& src, const std::filesystem::path& link) noexcept {
 		::HRESULT hResult;
 
 		::CComPtr<::IShellLinkW> lpShellLink = nullptr;
@@ -40,7 +40,7 @@ namespace linuxplorer::util::config {
 		return hResult;
 	}
 
-	std::wstring startup_config::get_startup_file_path() {
+	std::filesystem::path startup_config::get_startup_file_path() {
 		wchar_t appdata_path[MAX_PATH];
 
 		bool succeeded = ::GetEnvironmentVariableW(L"APPDATA", appdata_path, MAX_PATH);
@@ -48,10 +48,8 @@ namespace linuxplorer::util::config {
 			std::error_code ec(::GetLastError(), std::system_category());
 			throw config_system_error(ec, "Failed to get the environment variable: APPDATA");
 		}
-		std::wstring startup_path(appdata_path);
-		startup_path += L"\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\linuxplorer.lnk";
-
-		return startup_path;
+		
+		return std::filesystem::path(appdata_path) / L"Microsoft" / L"Windows" / L"Start Menu" / L"Programs" / L"Startup" / L"linuxplorer.lnk";
 	}
 
 	void startup_config::xload(const json_data_type& data) {

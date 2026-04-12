@@ -5,6 +5,7 @@
 #include <ssh/sftp/sftp_session.hpp>
 #include <streambuf>
 #include <iosfwd>
+#include <filesystem>
 
 namespace linuxplorer::ssh::sftp::io {
 	constexpr std::streamsize sftpbuf_default_buffer_size = 262144;	// 256 KiB
@@ -42,10 +43,16 @@ namespace linuxplorer::ssh::sftp::io {
 	class LINUXPLORER_SSH_API isftpstream : public std::basic_istream<char> {
 	protected:
 		std::unique_ptr<sftpbuf> m_buffer;
+		std::ios_base::openmode m_mode;
 	public:
-		explicit isftpstream(const sftp_session& session, std::wstring_view s, std::ios_base::openmode mode = std::ios_base::in);
+		explicit isftpstream(const sftp_session& session, const std::filesystem::path& s, std::ios_base::openmode mode = std::ios_base::in);
 		explicit isftpstream(const isftpstream&) = delete;
 		explicit isftpstream(isftpstream&& rhs);
+
+		isftpstream& operator=(const isftpstream& lhs) = delete;
+		isftpstream& operator=(isftpstream&& rhs);
+
+		std::ios_base::openmode mode() const noexcept;
 
 		virtual ~isftpstream() = default;
 	};
@@ -53,10 +60,16 @@ namespace linuxplorer::ssh::sftp::io {
 	class LINUXPLORER_SSH_API osftpstream : public std::basic_ostream<char> {
 	protected:
 		std::unique_ptr<sftpbuf> m_buffer;
+		std::ios_base::openmode m_mode;
 	public:
-		explicit osftpstream(const sftp_session& session, std::wstring_view s, std::ios_base::openmode mode = std::ios_base::out, long permissions_created = sftp_default_permissions_created);
+		explicit osftpstream(const sftp_session& session, const std::filesystem::path& s, std::ios_base::openmode mode = std::ios_base::out, long permissions_created = sftp_default_permissions_created);
 		explicit osftpstream(const osftpstream&) = delete;
 		explicit osftpstream(osftpstream&& rhs);
+
+		osftpstream& operator=(const osftpstream& lhs) = delete;
+		osftpstream& operator=(osftpstream&& rhs);
+
+		std::ios_base::openmode mode() const noexcept;
 
 		virtual ~osftpstream() = default;
 	};

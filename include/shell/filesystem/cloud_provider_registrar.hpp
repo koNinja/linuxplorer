@@ -32,7 +32,7 @@ namespace linuxplorer::shell::filesystem {
 	class LINUXPLORER_SHELL_API cloud_provider_registrar {
 	private:
 		static cloud_provider_session internal_register_provider(
-			std::wstring_view sync_root_dir,
+			const std::filesystem::path& sync_root_dir,
 			std::wstring_view provider_name,
 			std::wstring_view provider_version,
 			const registration_options* options
@@ -44,19 +44,19 @@ namespace linuxplorer::shell::filesystem {
 		~cloud_provider_registrar() = delete;
 
 		static cloud_provider_session register_provider(
-			std::wstring_view sync_root_dir,
+			const std::filesystem::path& sync_root_dir,
 			std::wstring_view provider_name,
 			std::wstring_view provider_version
 		);
 
 		static cloud_provider_session register_provider(
-			std::wstring_view sync_root_dir,
+			const std::filesystem::path& sync_root_dir,
 			std::wstring_view provider_name,
 			std::wstring_view provider_version,
 			const registration_options& options
 		);
 
-		static void unregister_provider(std::wstring_view sync_root_dir);
+		static void unregister_provider(const std::filesystem::path& sync_root_dir);
 	};
 }
 

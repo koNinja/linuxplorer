@@ -30,7 +30,7 @@ namespace linuxplorer::shell::functional {
 
 			// The parameter object may have already been discarded if the function is called late.
 			// Thus the object must be binded by some variable.
-			auto coroutine_parameters = fetch_data_callback_parameters(info, parameters);
+			auto coroutine_parameters = specialized::fetch_data_callback_parameters(info, parameters);
 			for (const auto& result : this->m_callback(coroutine_parameters)) {
 				operation_parameters.TransferData.CompletionStatus = STATUS_SUCCESS;
 				operation_parameters.TransferData.Offset.QuadPart = result.get_offset();
@@ -95,10 +95,10 @@ namespace linuxplorer::shell::functional {
 			operation_parameters.TransferPlaceholders.PlaceholderCount = placeholder_count;
 			operation_parameters.TransferPlaceholders.PlaceholderTotalCount.QuadPart = result.get_total_count_to_be_processed();
 
-			auto nt_placeholder_creation_info = placeholder_count > 0 ? std::make_unique<::CF_PLACEHOLDER_CREATE_INFO[]>(placeholder_count) : nullptr;
+			auto nt_placeholder_creation_info = placeholder_count > 0 ? std::vector<::CF_PLACEHOLDER_CREATE_INFO>(placeholder_count) : std::vector<::CF_PLACEHOLDER_CREATE_INFO>();
 			for (std::size_t i = 0; i < placeholder_count; i++) {
 				nt_placeholder_creation_info[i].Flags = ::CF_PLACEHOLDER_CREATE_FLAGS::CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC;
-				nt_placeholder_creation_info[i].RelativeFileName = result.get_creation_info()[i].get_relative_path().data();
+				nt_placeholder_creation_info[i].RelativeFileName = result.get_creation_info()[i].get_relative_path().c_str();
 				nt_placeholder_creation_info[i].FileIdentity = result.get_creation_info()[i].get_identity().data();
 				nt_placeholder_creation_info[i].FileIdentityLength = result.get_creation_info()[i].get_identity().size() * sizeof(std::byte);
 
@@ -115,7 +115,7 @@ namespace linuxplorer::shell::functional {
 				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.LastWriteTime.QuadPart = file_times.get_last_write_time().time_since_epoch().count();
 				nt_placeholder_creation_info[i].FsMetadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
 			}
-			operation_parameters.TransferPlaceholders.PlaceholderArray = nt_placeholder_creation_info.get();
+			operation_parameters.TransferPlaceholders.PlaceholderArray = nt_placeholder_creation_info.data();
 
 			std::size_t sum_of_processed_count = itr != s_sum_of_processed_count.end() ? itr->second : 0;
 			bool need_to_memorize_sum;
@@ -133,7 +133,7 @@ namespace linuxplorer::shell::functional {
 				need_to_memorize_sum = true;
 			}
 
-			::CfExecute(&operation_info, &operation_parameters);
+			::HRESULT hr = ::CfExecute(&operation_info, &operation_parameters);
 			if (need_to_memorize_sum) {
 				s_sum_of_processed_count[file_id] = sum_of_processed_count + operation_parameters.TransferPlaceholders.EntriesProcessed;
 			}
@@ -161,7 +161,7 @@ namespace linuxplorer::shell::functional {
 		const ::CF_CALLBACK_PARAMETERS* parameters
 	) const {
 		try {
-			this->m_callback(cancel_fetch_data_callback_parameters(info, parameters));
+			this->m_callback(specialized::cancel_fetch_data_callback_parameters(info, parameters));
 		}
 		// ignore all
 		catch (...) {}
@@ -188,7 +188,7 @@ namespace linuxplorer::shell::functional {
 		operation_parameters.AckRename.Flags = ::CF_OPERATION_ACK_RENAME_FLAGS::CF_OPERATION_ACK_RENAME_FLAG_NONE;
 
 		try {
-			this->m_callback(rename_callback_parameters(info, parameters));
+			this->m_callback(specialized::rename_callback_parameters(info, parameters));
 			operation_parameters.AckRename.CompletionStatus = STATUS_SUCCESS;
 		}
 		catch (const callback_abort_exception& e) {
@@ -207,7 +207,7 @@ namespace linuxplorer::shell::functional {
 		const ::CF_CALLBACK_PARAMETERS* parameters
 	) const {
 		try {
-			this->m_callback(rename_completion_callback_parameters(info, parameters));
+			this->m_callback(specialized::rename_completion_callback_parameters(info, parameters));
 		}
 		// ignore all
 		catch (...) {}
@@ -233,7 +233,7 @@ namespace linuxplorer::shell::functional {
 		operation_parameters.ParamSize = FIELD_OFFSET(::CF_OPERATION_PARAMETERS, AckDelete) + sizeof(::CF_OPERATION_PARAMETERS::AckDelete);
 		operation_parameters.AckDelete.Flags = ::CF_OPERATION_ACK_DELETE_FLAGS::CF_OPERATION_ACK_DELETE_FLAG_NONE;
 		try {
-			auto result = this->m_callback(delete_callback_parameters(info, parameters));
+			auto result = this->m_callback(specialized::delete_callback_parameters(info, parameters));
 			operation_parameters.AckDelete.CompletionStatus = result.get_status();
 		}
 		catch (const callback_abort_exception& e) {
@@ -252,7 +252,7 @@ namespace linuxplorer::shell::functional {
 		const ::CF_CALLBACK_PARAMETERS* parameters
 	) const {
 		try {
-			this->m_callback(rename_completion_callback_parameters(info, parameters));
+			this->m_callback(specialized::rename_completion_callback_parameters(info, parameters));
 		}
 		// ignore all
 		catch (...) {}

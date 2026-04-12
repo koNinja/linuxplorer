@@ -5,18 +5,32 @@
 #include <memory>
 
 namespace linuxplorer::shell {
-	cloud_provider_session::cloud_provider_session(std::wstring_view sync_root_dir)
-		: m_sync_root_dir(sync_root_dir), m_is_connected(false), m_connection_key(::CF_CONNECTION_KEY{}) {}
+	cloud_provider_session::cloud_provider_session(const std::filesystem::path& sync_root_dir) : 
+		m_sync_root_dir(sync_root_dir), m_is_connected(false), m_connection_key(::CF_CONNECTION_KEY{}) {}
 
-	cloud_provider_session::cloud_provider_session(cloud_provider_session&& right)
-		: m_sync_root_dir(std::move(right.m_sync_root_dir)), m_is_connected(right.m_is_connected), m_connection_key(right.m_connection_key) {}
+	cloud_provider_session::cloud_provider_session(cloud_provider_session&& rhs) :
+		m_sync_root_dir(std::move(rhs.m_sync_root_dir)), m_is_connected(rhs.m_is_connected), m_connection_key(rhs.m_connection_key) {}
 
-	cloud_provider_session& cloud_provider_session::operator=(cloud_provider_session&& right) {
-		if (this != &right) {
-			this->m_sync_root_dir = std::move(right.m_sync_root_dir);
-			this->m_connection_key = right.m_connection_key;
+	cloud_provider_session& cloud_provider_session::operator=(cloud_provider_session&& rhs) {
+		if (this != &rhs) {
+			this->m_sync_root_dir = std::move(rhs.m_sync_root_dir);
+			this->m_connection_key = rhs.m_connection_key;
 		}
 		return *this;
+	}
+
+	void cloud_provider_session::register_callback(std::unique_ptr<functional::cloud_provider_callback> callback) {
+		if (!callback) return;
+
+		auto type = callback->get_type();
+		auto xitr = std::find_if(this->m_temporary_callback_table.begin(), this->m_temporary_callback_table.end(), [type](const decltype(this->m_temporary_callback_table)::value_type& ptr) {
+			return ptr->get_type() == type;
+		});
+		if (xitr != this->m_temporary_callback_table.end()) {
+			throw functional::callback_duplication_exception(callback->get_type(), "The callback for the specified type has been already registered.");
+		}
+
+		this->m_temporary_callback_table.push_back(std::move(callback));
 	}
 
 	void cloud_provider_session::connect() {
@@ -50,7 +64,11 @@ namespace linuxplorer::shell {
 		}
 
 		this->m_is_connected = true;
-		this_t::s_callbacks[this->m_connection_key] = std::move(this->m_temporary_callback_table);
+
+		{
+			std::unique_lock lock(this_t::s_callback_table_mutex);
+			this_t::s_callbacks[this->m_connection_key] = std::move(this->m_temporary_callback_table);
+		}
 	}
 
 	void cloud_provider_session::disconnect() {
@@ -65,10 +83,14 @@ namespace linuxplorer::shell {
 		}
 
 		this->m_is_connected = false;
-		this->m_temporary_callback_table = std::move(this_t::s_callbacks[this->m_connection_key.get()]);
+
+		{
+			std::unique_lock lock(this_t::s_callback_table_mutex);
+			this->m_temporary_callback_table = std::move(this_t::s_callbacks[this->m_connection_key.get()]);
+		}
 	}
 
-	std::wstring_view cloud_provider_session::get_sync_root_dir() const noexcept {
+	const std::filesystem::path& cloud_provider_session::get_sync_root_dir() const noexcept {
 		return this->m_sync_root_dir;
 	}
 
@@ -77,9 +99,16 @@ namespace linuxplorer::shell {
 	}
 
 	cloud_provider_session::~cloud_provider_session() noexcept {
-		std::erase_if(this_t::s_callbacks, [this](const decltype(this_t::s_callbacks)::value_type& px) -> bool {
-			return px.first.get().Internal == this->get_connection_key().get().Internal;
-		});
+		try {
+			if (this->m_is_connected) this->disconnect();
+
+			std::unique_lock lock(this_t::s_callback_table_mutex);
+			std::erase_if(this_t::s_callbacks, [this](const decltype(this_t::s_callbacks)::value_type& px) -> bool {
+				return px.first.get().Internal == this->get_connection_key().get().Internal;
+			});
+		}
+		// Abandon removing callback entries from the global table
+		catch (...) {}
 	}
 
 	::CF_CALLBACK cloud_provider_session::get_typed_caller_from_type(functional::cloud_provider_callback_type type) noexcept {
@@ -133,7 +162,9 @@ namespace linuxplorer::shell {
 
 	template <functional::cloud_provider_callback_type T>
 	void cloud_provider_session::typed_internal_caller(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters) {
+		std::unique_lock lock(this_t::s_callback_table_mutex);
 		const auto& callbacks = this_t::s_callbacks[info->ConnectionKey];
+		lock.unlock();
 
 		constexpr auto type = T;
 		const auto& callback_ptr_itr = std::find_if(callbacks.begin(), callbacks.end(), [type](const std::unique_ptr<functional::cloud_provider_callback>& ptr) { return ptr->get_type() == type; });

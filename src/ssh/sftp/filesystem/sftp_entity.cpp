@@ -102,7 +102,11 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		return this->m_last_access_time;
 	}
 
-	internal::directory_iterator_context::directory_iterator_context(const sftp_session& session, const std::filesystem::path& path) : m_handle(open(session, path, open_permissions::read)), m_end_reached(false) {
+	internal::directory_iterator_context::directory_iterator_context(const sftp_session& session, const std::filesystem::path& path) : 
+		m_handle(open(session, path, open_permissions::read)),
+		m_end_reached(false),
+		m_path(path)
+	{
 		this->next();	// Preload first entry
 	}
 
@@ -130,15 +134,19 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			}
 			else if (bytes_read == 0) {
 				m_end_reached = true;
-				return;
+				break;
 			}
 			else {}
 
-			std::filesystem::path path = std::u8string_view(buffer, bytes_read);
+			std::filesystem::path p = std::u8string_view(buffer, bytes_read);
+			
+			if (p.filename() != L"." && p.filename() != L"..") {
+				std::filesystem::path full_path = this->m_path;
+				full_path.concat(L"/").concat(p.wstring());
 
-			if (path.filename() != L"." && path.filename() != L"..") {
 				this->m_current = directory_entry(
-					path,
+					// libssh2_sftp_readdir_ex returns filename only.
+					full_path,
 					attr.filesize,
 					internal::status_flags_to_file_status(attr.permissions),
 					unix_to_filetime(attr.atime),
@@ -149,7 +157,11 @@ namespace linuxplorer::ssh::sftp::filesystem {
 		}
 	}
 
-	directory_iterator::directory_iterator(const sftp_session& session, const std::filesystem::path& path, std::filesystem::directory_options options) : m_context(std::make_shared<internal::directory_iterator_context>(session, path)) {}
+	directory_iterator::directory_iterator() noexcept : m_context(nullptr) {}
+
+	directory_iterator::directory_iterator(const sftp_session& session, const std::filesystem::path& path, std::filesystem::directory_options options) : m_context(std::make_shared<internal::directory_iterator_context>(session, path)) {
+		if (this->m_context->end_reached()) this->m_context.reset();
+	}
 
 	const directory_iterator::value_type& directory_iterator::operator*() const noexcept {
 		return this->m_context->current();

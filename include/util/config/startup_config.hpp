@@ -21,8 +21,8 @@ namespace linuxplorer::util::config {
 	private:
 		bool m_enabled;
 
-		static std::wstring get_startup_file_path();
-		static long create_link_without_co_initialization(const std::wstring& src, const std::wstring& link) noexcept;
+		static std::filesystem::path get_startup_file_path();
+		static long create_link_without_co_initialization(const std::filesystem::path& src, const std::filesystem::path& link) noexcept;
 	protected:
 		virtual void xload(const json_data_type& data) override;
 		virtual json_data_type xsave() const override;

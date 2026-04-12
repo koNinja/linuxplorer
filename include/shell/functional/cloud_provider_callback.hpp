@@ -6,7 +6,6 @@
 #include <shell/cloud_provider_session_token.hpp>
 #include <shell/functional/callback_parameters.hpp>
 #include <shell/functional/callback_operation_info.hpp>
-#include <shell/models/chunked_callback_generator.hpp>
 
 #define DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(Type, Return, Parameter)	\
 	template <>																\
@@ -52,12 +51,12 @@ namespace linuxplorer::shell::functional {
 			using callback_parameters = callback_parameters;
 			using operation_info = operation_info;
 		};
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::fetch_data, models::chunked_callback_generator<fetch_data_operation_info>, fetch_data_callback_parameters);
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::fetch_placeholders, fetch_placeholders_operation_info, callback_parameters);
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::cancel_fetching_data, void, cancel_fetch_data_callback_parameters);
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming, operation_info, rename_callback_parameters);
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming_completion, void, rename_completion_callback_parameters);
-		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion, delete_operation_info, delete_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::fetch_data, specialized::fetch_data_operation_info, specialized::fetch_data_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::fetch_placeholders, specialized::fetch_placeholders_operation_info, callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::cancel_fetching_data, void, specialized::cancel_fetch_data_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming, operation_info, specialized::rename_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming_completion, void, specialized::rename_completion_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion, specialized::delete_operation_info, specialized::delete_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion_completion, void, callback_parameters);
 	}
 
@@ -97,13 +96,21 @@ namespace linuxplorer::shell::functional {
 		virtual ~specialized_cloud_provider_callback() noexcept = default;
 	};
 
-	using fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
-	using fetch_placeholders_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
-	using cancel_fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
-	using rename_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>;
-	using rename_completion_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>;
-	using delete_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>;
-	using delete_completion_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion_completion>;
+	namespace specialized {
+		using fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
+		using fetch_placeholders_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
+		using cancel_fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
+		using rename_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>;
+		using rename_completion_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>;
+		using delete_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>;
+		using delete_completion_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion_completion>;
+	}
+
+	template <cloud_provider_callback_type T, class F, class O>
+	specialized_cloud_provider_callback<T> make_callback(F&& method, O& object) {
+		typed_cloud_provider_callback_t<T> functor = std::bind(method, std::ref(object), std::placeholders::_1);
+		return specialized_cloud_provider_callback<T>(std::move(functor));
+	}
 
 	class callback_abort_exception {
 	private:

@@ -63,10 +63,10 @@ namespace linuxplorer::util::config {
 	private:
 		std::wstring m_name;
 		credential m_credential;
-		std::wstring m_syncroot;
+		std::filesystem::path m_syncroot;
 		std::uint16_t m_port;
 	public:
-		profile(std::wstring_view name, std::wstring_view syncroot, std::uint16_t port, const credential& credential) : m_name(name), m_port(port), m_syncroot(syncroot), m_credential(credential) {}
+		profile(std::wstring_view name, const std::filesystem::path& syncroot, std::uint16_t port, const credential& credential) : m_name(name), m_port(port), m_syncroot(syncroot), m_credential(credential) {}
 
 		inline credential& get_credential() noexcept {
 			return this->m_credential;
@@ -78,10 +78,10 @@ namespace linuxplorer::util::config {
 			this->m_credential = credential;
 		}
 
-		inline const std::wstring_view get_syncroot() const noexcept {
+		inline const std::filesystem::path& get_syncroot() const noexcept {
 			return this->m_syncroot;
 		}
-		inline void set_syncroot(std::wstring_view syncroot) noexcept {
+		inline void set_syncroot(const std::filesystem::path& syncroot) noexcept {
 			this->m_syncroot = syncroot;
 		}
 
