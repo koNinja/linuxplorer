@@ -11,9 +11,14 @@
 #include <mutex>
 #include <optional>
 
+#include "cancellation_map.hpp"
+
 namespace linuxplorer::lxpsvc::contexts {
 	class execution_context {
 	private:
+		cancellation_map m_cancellation_map;
+		io_operation_factory m_factory;
+
 		std::mutex m_tasks_mutex;
 		std::queue<std::unique_ptr<models::operations::io_operation>> m_tasks;
 		win32::unique_event_handle m_task_scheduled_event;
@@ -27,6 +32,9 @@ namespace linuxplorer::lxpsvc::contexts {
 
 		void enqueue_task(std::unique_ptr<models::operations::io_operation> task);
 		std::unique_ptr<models::operations::io_operation> dequeue_task();
+
+		io_operation_factory& get_factory() noexcept;
+		bool try_cancel_operation(models::operations::io_operation::identifier_type id);
 
 		void enqueue_error(const exceptions::fatal_runtime_exception& request);
 		std::optional<exceptions::fatal_runtime_exception> dequeue_error();

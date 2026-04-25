@@ -168,6 +168,18 @@ namespace linuxplorer::shell::functional {
 	}
 
 	template <>
+	void specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_placeholders>::internal_nt_callback(
+		const ::CF_CALLBACK_INFO* info,
+		const ::CF_CALLBACK_PARAMETERS* parameters
+	) const {
+		try {
+			this->m_callback(callback_parameters(info, parameters));
+		}
+		// ignore all
+		catch (...) {}
+	}
+
+	template <>
 	void specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>::internal_nt_callback(
 		const ::CF_CALLBACK_INFO* info,
 		const ::CF_CALLBACK_PARAMETERS* parameters
@@ -261,6 +273,7 @@ namespace linuxplorer::shell::functional {
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
     template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
+	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_placeholders>;
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>;
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>;
 	template class LINUXPLORER_SHELL_API specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>;

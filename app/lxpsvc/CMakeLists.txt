@@ -12,6 +12,7 @@ target_compile_definitions(${LINUXPLORER_APP_SERVICE_NAME}
 )
 target_sources(${LINUXPLORER_APP_SERVICE_NAME} 
 	PUBLIC
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/contexts/cancellation_map.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/contexts/execution_context.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/exceptions/abnormal_systems.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/helpers/path_helper.hpp

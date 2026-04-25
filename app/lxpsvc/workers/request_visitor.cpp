@@ -312,7 +312,6 @@ namespace linuxplorer::lxpsvc::workers {
 				request.get_range().get_length()
 			);
 
-			// iss.seekg(request.get_range().get_offset());
 			iss.read(reinterpret_cast<char*>(data.data()), request.get_range().get_length());
 			
 			request.set_value(std::move(data));
@@ -354,6 +353,12 @@ namespace linuxplorer::lxpsvc::workers {
 
 		try {
 			for (const auto& entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session, request.get_absolute_path())) {
+				if (request.has_cancel_requested()) {
+					request.set_exception(shell::functional::callback_abort_exception(ERROR_CLOUD_FILE_REQUEST_CANCELED));
+					LOG_INFO(this->m_logger, "The cancellation for this placeholder enumeration has been accepted.");
+					return models::requests::request_result::cancelled;
+				}
+
 				auto placeholder_name = entity.path().filename();
 				
 				if (contains_invalid_ntfs_character(placeholder_name.wstring())) {

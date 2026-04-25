@@ -11,8 +11,8 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 	private:
 		std::filesystem::file_type m_type;
 	public:
-		creation_request(const std::filesystem::path& absolute_path, std::filesystem::file_type type) : 
-			io_request(absolute_path), m_type(type)
+		creation_request(const std::filesystem::path& absolute_path, std::filesystem::file_type type, const std::stop_token& stop_token) : 
+			io_request(absolute_path, stop_token), m_type(type)
 		{}
 
 		std::filesystem::file_type get_type() const noexcept {
@@ -31,8 +31,8 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 		models::requests::remote::modification_type m_type;
 
 	public:
-		modification_request(const std::filesystem::path& absolute_path, const range<std::size_t>& range, models::requests::remote::modification_type type) : 
-			io_request(absolute_path), m_range(range), m_type(type)
+		modification_request(const std::filesystem::path& absolute_path, const range<std::size_t>& range, models::requests::remote::modification_type type, const std::stop_token& stop_token) : 
+			io_request(absolute_path, stop_token), m_range(range), m_type(type)
 		{}
 
 		const range<std::size_t> get_range() const noexcept {
@@ -46,8 +46,8 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 
 	class deletion_request : public synchronous_io_request<void> {
 	public:
-		deletion_request(const std::filesystem::path& absolute_path, result_adapter<void>& adapter) :
-			synchronous_io_request<void>(absolute_path, adapter) 
+		deletion_request(const std::filesystem::path& absolute_path, result_adapter<void>& adapter, const std::stop_token& stop_token) :
+			synchronous_io_request<void>(absolute_path, adapter, stop_token) 
 		{}
 	};
 
@@ -55,8 +55,8 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 	private:
 		std::filesystem::path m_absolute_new_path;
 	public:
-		renaming_request(const std::filesystem::path& absolute_old_path, const std::filesystem::path& absolute_new_path, result_adapter<void>& adapter) : 
-			synchronous_io_request<>(absolute_old_path, adapter), m_absolute_new_path(absolute_new_path)
+		renaming_request(const std::filesystem::path& absolute_old_path, const std::filesystem::path& absolute_new_path, result_adapter<void>& adapter, const std::stop_token& stop_token) : 
+			synchronous_io_request<>(absolute_old_path, adapter, stop_token), m_absolute_new_path(absolute_new_path)
 		{}
 
 		const std::filesystem::path& get_absolute_new_path() const noexcept {
@@ -70,8 +70,8 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 	private:
 		range<std::size_t> m_range;
 	public:
-		hydration_request(const std::filesystem::path& absolute_path, const range<std::size_t>& range, result_adapter<result_t>& adapter) : 
-			synchronous_io_request<result_t>(absolute_path, adapter), m_range(range)
+		hydration_request(const std::filesystem::path& absolute_path, const range<std::size_t>& range, result_adapter<result_t>& adapter, const std::stop_token& stop_token) : 
+			synchronous_io_request<result_t>(absolute_path, adapter, stop_token), m_range(range)
 		{}
 
 		const range<std::size_t> get_range() const noexcept {
@@ -83,8 +83,8 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 	public:
 		using result_t = std::vector<shell::filesystem::placeholder_creation_info>;
 	public:
-		population_request(const std::filesystem::path& absolute_path, result_adapter<result_t>& adapter) :
-			synchronous_io_request<result_t>(absolute_path, adapter) 
+		population_request(const std::filesystem::path& absolute_path, result_adapter<result_t>& adapter, const std::stop_token& stop_token) :
+			synchronous_io_request<result_t>(absolute_path, adapter, stop_token) 
 		{}
 	};
 }

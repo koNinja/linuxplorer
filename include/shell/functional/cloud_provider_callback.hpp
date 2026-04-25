@@ -17,10 +17,10 @@
 namespace linuxplorer::shell::functional {
 	enum class cloud_provider_callback_type : std::underlying_type_t<::CF_CALLBACK_TYPE> {
 		fetch_data = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_FETCH_DATA,
-		validate_data = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_VALIDATE_DATA,									// unused
+		validate_data = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_VALIDATE_DATA,									// not implemented yet
 		cancel_fetching_data = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_CANCEL_FETCH_DATA,
 		fetch_placeholders = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_FETCH_PLACEHOLDERS,
-		cancel_fetching_placeholders = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_CANCEL_FETCH_PLACEHOLDERS,		// not implemented yet
+		cancel_fetching_placeholders = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_CANCEL_FETCH_PLACEHOLDERS,
 		notify_file_open_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_FILE_OPEN_COMPLETION,		// not implemented yet
 		notify_file_close_completion = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_FILE_CLOSE_COMPLETION,	// not implemented yet
 		notify_dehydration = ::CF_CALLBACK_TYPE::CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE,							// not implemented yet
@@ -54,6 +54,7 @@ namespace linuxplorer::shell::functional {
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::fetch_data, specialized::fetch_data_operation_info, specialized::fetch_data_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::fetch_placeholders, specialized::fetch_placeholders_operation_info, callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::cancel_fetching_data, void, specialized::cancel_fetch_data_callback_parameters);
+		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::cancel_fetching_placeholders, void, callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming, operation_info, specialized::rename_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_renaming_completion, void, specialized::rename_completion_callback_parameters);
 		DECLARE_TYPED_CALLBACK_SIGNITURE_ALIASES(shell::functional::cloud_provider_callback_type::notify_deletion, specialized::delete_operation_info, specialized::delete_callback_parameters);
@@ -100,6 +101,7 @@ namespace linuxplorer::shell::functional {
 		using fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_data>;
 		using fetch_placeholders_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::fetch_placeholders>;
 		using cancel_fetch_data_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_data>;
+		using cancel_fetch_placeholders_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::cancel_fetching_placeholders>;
 		using rename_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming>;
 		using rename_completion_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_renaming_completion>;
 		using delete_callback = specialized_cloud_provider_callback<cloud_provider_callback_type::notify_deletion>;

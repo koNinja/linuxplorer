@@ -152,6 +152,11 @@ namespace linuxplorer::lxpsvc::workers {
 
 			while (!nullable_task->done()) {
 				try {
+					if (nullable_task->has_cancel_requested()) {
+						nullable_task->transition(models::requests::request_result::cancelled);
+						break;
+					}
+
 					auto any_request = nullable_task->fetch();
 					models::requests::request_result result = std::visit(this->m_visitor, any_request);
 					nullable_task->transition(result);

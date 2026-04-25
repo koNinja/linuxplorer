@@ -50,8 +50,15 @@ namespace linuxplorer::lxpsvc::models::operations {
 	};
 
 	class io_operation {
+	public:
+		using identifier_type = std::uint64_t;
 	private:
-		inline static std::atomic<std::uint64_t> s_id_prefix = 0;
+		inline static constexpr std::uint32_t s_max_attempts = 3;
+		inline static std::atomic<identifier_type> s_id_prefix = 0;
+	public:
+		static std::uint32_t get_max_attempts() noexcept {
+			return s_max_attempts;
+		}
 	protected:
 		using request_variant_t = generic_request_variant_t<
 			requests::remote::creation_request,
@@ -66,19 +73,25 @@ namespace linuxplorer::lxpsvc::models::operations {
 			requests::local::hydration_triggering_request
 		>;
 	private:
-		const std::uint64_t m_id;
+		const identifier_type m_id;
 		operation_priority m_priority;
 		std::filesystem::path m_absolute_path;
 		helpers::path_helper m_path_helper;
 		operation_result m_result;
+		std::shared_ptr<std::stop_source> m_stop_source;
+		std::stop_token m_stop_token;
+
+		std::uint32_t m_attempts;
 	public:
 		io_operation(operation_priority priority, const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
 			m_id(s_id_prefix.fetch_add(1, std::memory_order::relaxed)),
 			m_priority(priority),
-			m_path_helper(syncroot),
-			m_result(operation_result::pending)
+			m_result(operation_result::pending),
+			m_absolute_path(syncroot / relative_path),
+			m_path_helper(syncroot)
 		{
-			this->m_absolute_path = this->m_path_helper.to_absolute(relative_path);
+			this->m_stop_source = std::make_shared<std::stop_source>();
+			this->m_stop_token = this->m_stop_source->get_token();
 		}
 
 		io_operation(const io_operation& lhs) = delete;
@@ -117,11 +130,15 @@ namespace linuxplorer::lxpsvc::models::operations {
 			switch (result) {
 			case requests::request_result::success:
 				this->transition_on_success();
+				this->m_attempts = 0;
 				if (this->done()) this->m_result = operation_result::succeeded;
 				break;
 			case requests::request_result::transient_failure:
-				this->transition_on_transient_failure();
-				break;
+				if (++this->m_attempts <= s_max_attempts) {
+					this->transition_on_transient_failure();
+					break;
+				}
+				else [[fallthrough]];
 			case requests::request_result::permanent_failure:
 				this->transition_on_permanent_failure();
 				this->m_result = operation_result::failed;
@@ -133,6 +150,18 @@ namespace linuxplorer::lxpsvc::models::operations {
 			default:
 				break;
 			}
+		}
+
+		bool has_cancel_requested() const noexcept {
+			return this->m_stop_token.stop_requested();
+		}
+
+		std::weak_ptr<std::stop_source> get_stop_source() const noexcept {
+			return this->m_stop_source;
+		}
+
+		std::uint32_t get_current_attempts() const noexcept {
+			return this->m_attempts;
 		}
 
 		virtual ~io_operation() = default;
@@ -149,14 +178,20 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual bool should_execute() const {
 			return true;
 		}
+
+		const std::stop_token& get_stop_token() const noexcept {
+			return this->m_stop_token;
+		}
 	};
+
+	template <class T>
+	concept is_operation_v = std::is_base_of_v<io_operation, T>;
 
 	template <class state_traits>
 	class stateful_io_operation : public io_operation {
 	protected:
 		using traits_type = state_traits;
 		using state_type = typename traits_type::state_type;
-
 	private:
 		std::atomic<state_type> m_state;
 	protected:
@@ -232,7 +267,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 	class modification_operation : public stateful_io_operation<internal::modification_operation_state_traits> {
 	private:
 		mutable std::optional<std::vector<range<std::size_t>>> m_ranges;
-		void acquire_modified_ranges_consted_if() const;
+		void acquire_modified_ranges_if_consted() const;
 
 		std::size_t m_current_range_index;
 		models::requests::remote::modification_type m_type;
@@ -252,6 +287,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		mutable std::shared_ptr<requests::result_adapter<void>> m_adapter;
 	protected:
 		virtual void transition_on_success() noexcept override;
+		virtual void transition_on_permanent_failure() noexcept override;
+		virtual void transition_on_cancelled() noexcept override;
 	public:
 		deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
 
@@ -273,8 +310,10 @@ namespace linuxplorer::lxpsvc::models::operations {
 		std::filesystem::path m_absolute_new_path;
 	protected:
 		virtual void transition_on_success() noexcept override;
+		virtual void transition_on_permanent_failure() noexcept override;
+		virtual void transition_on_cancelled() noexcept override;
 	public:
-		renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_old_path, const std::filesystem::path& absolute_new_path);
+		renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const std::filesystem::path& absolute_new_path);
 
 		virtual request_variant_t fetch() const override;
 
@@ -325,6 +364,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		mutable std::shared_ptr<requests::result_adapter<result_t>> m_adapter;
 	protected:
 		virtual void transition_on_success() noexcept override;
+		virtual void transition_on_permanent_failure() noexcept override;
+		virtual void transition_on_cancelled() noexcept override;
 	public:
 		hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range);
 
@@ -342,6 +383,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		mutable std::shared_ptr<requests::result_adapter<result_t>> m_adapter;
 	protected:
 		virtual void transition_on_success() noexcept override;
+		virtual void transition_on_permanent_failure() noexcept override;
+		virtual void transition_on_cancelled() noexcept override;
 	public:
 		population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
 

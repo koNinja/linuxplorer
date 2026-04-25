@@ -1,7 +1,7 @@
 #include "execution_context.hpp"
 
 namespace linuxplorer::lxpsvc::contexts {
-	execution_context::execution_context() {
+	execution_context::execution_context() : m_factory(this->m_cancellation_map) {
 		this->m_task_scheduled_event = ::CreateEventW(nullptr, true, false, nullptr);
 		if (!this->m_task_scheduled_event) {
 			std::error_code ec(::GetLastError(), std::system_category());
@@ -78,5 +78,13 @@ namespace linuxplorer::lxpsvc::contexts {
 
 	const win32::unique_event_handle& execution_context::get_error_event() const noexcept {
 		return this->m_error_propagated_event;
+	}
+
+	io_operation_factory& execution_context::get_factory() noexcept {
+		return this->m_factory;
+	}
+
+	bool execution_context::try_cancel_operation(models::operations::io_operation::identifier_type id) {
+		return this->m_cancellation_map.try_cancel_operation(id);
 	}
 }

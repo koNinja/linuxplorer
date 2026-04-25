@@ -17,11 +17,16 @@ namespace linuxplorer::lxpsvc::workers {
 			parameters.get_length()
 		);
 
-		auto operation = std::make_unique<models::operations::hydration_operation>(
+		auto operation = this->m_execution_context.get_factory().create_with_cancellation<models::operations::hydration_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path),
 			models::range<std::size_t>(parameters.get_offset(), parameters.get_length())
 		);
+
+		{
+			std::unique_lock lock(this->m_cancellable_map_mutex);
+			this->m_cancellable_operations[win32::get_frn(parameters.get_absolute_placeholder_path())] = operation->get_id();
+		}
 		
 		auto adapter = operation->get_adapter().lock();
 
@@ -53,6 +58,12 @@ namespace linuxplorer::lxpsvc::workers {
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path)
 		);
+
+		{
+			std::unique_lock lock(this->m_cancellable_map_mutex);
+			// maybe will be blocked...
+			this->m_cancellable_operations[win32::get_frn(parameters.get_absolute_placeholder_path())] = operation->get_id();
+		}
 		
 		auto adapter = operation->get_adapter().lock();
 
@@ -114,6 +125,26 @@ namespace linuxplorer::lxpsvc::workers {
 	}
 
 	void callback_table::on_cancel_fetch_data(const shell::functional::specialized::cancel_fetch_data_callback_parameters& parameters) {
+		std::unique_lock lock(this->m_cancellable_map_mutex);
+		auto itr = this->m_cancellable_operations.find(win32::get_frn(parameters.get_absolute_placeholder_path()));
+		if (itr == this->m_cancellable_operations.end()) return;
 
+		if (this->m_execution_context.try_cancel_operation(itr->second)) {
+			LOG_INFO(this->m_logger, "A cancellation for the hydration operation #{} was successfully transmitted.", itr->second);
+		}
+
+		this->m_cancellable_operations.erase(itr);
+	}
+
+	void callback_table::on_cancel_fetch_placeholders(const shell::functional::callback_parameters& parameters) {
+		std::unique_lock lock(this->m_cancellable_map_mutex);
+		auto itr = this->m_cancellable_operations.find(win32::get_frn(parameters.get_absolute_placeholder_path()));
+		if (itr == this->m_cancellable_operations.end()) return;
+
+		if (this->m_execution_context.try_cancel_operation(itr->second)) {
+			LOG_INFO(this->m_logger, "A cancellation for the operation #{} for a placeholder enumeration was successfully transmitted.", itr->second);
+		}
+
+		this->m_cancellable_operations.erase(itr);
 	}
 }
