@@ -4,6 +4,7 @@
 #include <shell/shellfwd.hpp>
 #include <functional>
 #include <windows.h>
+#include <winternl.h>
 #include <cfapi.h>
 
 namespace linuxplorer::shell {

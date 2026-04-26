@@ -5,9 +5,7 @@
 #include <util/charset/multibyte_wide_compat_helper.hpp>
 
 namespace linuxplorer::ssh::auth {
-	ssh_knownhosts::ssh_knownhosts(const ssh_session& session, std::wstring_view path) : m_session(session) {
-		using charset_helper = linuxplorer::util::charset::multibyte_wide_compat_helper;
-
+	ssh_knownhosts::ssh_knownhosts(const ssh_session& session, const std::filesystem::path& path) : m_session(session) {
 		if (path.compare(default_knownhosts_path) == 0) {
 			std::int32_t userprofile_path_length = ::GetEnvironmentVariableW(L"USERPROFILE", nullptr, 0);
 			if (userprofile_path_length == 0) {
@@ -33,7 +31,11 @@ namespace linuxplorer::ssh::auth {
 			throw ssh_libssh2_exception(std::error_code(session.get_last_errno(), libssh2_category(session)), "Failed to initialize known hosts.");
 		}
 
-		int result = libssh2_knownhost_readfile(this->m_knownhosts.get(), charset_helper::convert_wide_to_multibyte(this->m_knownhosts_path).c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
+		int result = ::libssh2_knownhost_readfile(
+			this->m_knownhosts.get(),
+			this->m_knownhosts_path.string().c_str(),
+			LIBSSH2_KNOWNHOST_FILE_OPENSSH
+		);
 		if (result < 0) {
 			throw ssh_libssh2_exception(std::error_code(result, libssh2_category(session)), "Failed to read known hosts file.");
 		}
@@ -140,7 +142,11 @@ namespace linuxplorer::ssh::auth {
 	void ssh_knownhosts::flush() const {
 		using charset_helper = util::charset::multibyte_wide_compat_helper;
 
-		int rc = ::libssh2_knownhost_writefile(this->m_knownhosts.get(), charset_helper::convert_wide_to_multibyte(this->m_knownhosts_path).c_str(), LIBSSH2_KNOWNHOST_FILE_OPENSSH);
+		int rc = ::libssh2_knownhost_writefile(
+			this->m_knownhosts.get(),
+			this->m_knownhosts_path.string().c_str(),
+			LIBSSH2_KNOWNHOST_FILE_OPENSSH
+		);
 		if (rc < 0) {
 			throw ssh_libssh2_exception(std::error_code(rc, libssh2_category(this->m_session)), "Failed to write data to a known hosts file.");
 		}

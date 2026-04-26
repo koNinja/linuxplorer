@@ -8,7 +8,7 @@
 #define STRINGIFY(x)	TO_STRING(x)
 
 namespace linuxplorer::util::config {
-	static std::wstring get_userprofile_path() {
+	static std::filesystem::path get_userprofile_path() {
 		constexpr std::size_t path_len = MAX_PATH;
 		wchar_t path[path_len];
 		auto rc = ::GetEnvironmentVariableW(L"USERPROFILE", path, path_len);
@@ -20,18 +20,15 @@ namespace linuxplorer::util::config {
 		return path;
 	}
 
-	std::wstring configuration_manager::get_root_path() {
-		std::wstring result = get_userprofile_path();
-		result += L"\\.linuxplorer";
-
-		return result;
+	std::filesystem::path configuration_manager::get_root_path() {
+		return get_userprofile_path() / L".Linuxplorer";
 	}
 
-	std::wstring configuration_manager::get_config_path() {
-		return get_root_path() + L"\\config.json";
+	std::filesystem::path configuration_manager::get_config_path() {
+		return get_root_path() / L"config.json";
 	}
 
-	std::wstring configuration_manager::get_install_path() {
+	std::filesystem::path configuration_manager::get_install_path() {
 		constexpr std::size_t path_len = MAX_PATH;
 		wchar_t module_file_path[path_len];
 		auto rc = ::GetModuleFileNameW(nullptr, module_file_path, path_len);
@@ -40,13 +37,11 @@ namespace linuxplorer::util::config {
 			throw config_system_error(ec, "Failed to retrieve the path for the current process executable.");
 		}
 
-		std::wstring_view view(module_file_path, rc);
-
-		return std::wstring(view.substr(0, view.find_last_of(L'\\')));
+		return std::filesystem::path(std::wstring_view(module_file_path, rc)).parent_path();
 	}
 
-	std::wstring configuration_manager::get_log_path() {
-		return get_root_path() + L"\\logs\\service.log";
+	std::filesystem::path configuration_manager::get_log_path() {
+		return get_root_path() / L"logs";
 	}
 
 	void configuration_manager::initialize() {

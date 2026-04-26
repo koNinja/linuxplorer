@@ -4,10 +4,10 @@
 #include <shell/shellfwd.hpp>
 #include <shell/functional/cloud_provider_callback.hpp>
 
-#include <string>
-#include <string_view>
+#include <filesystem>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace linuxplorer::shell {
@@ -19,38 +19,34 @@ namespace linuxplorer::shell {
 
 		template <functional::cloud_provider_callback_type T>
 		static void typed_internal_caller(const ::CF_CALLBACK_INFO* info, const ::CF_CALLBACK_PARAMETERS* parameters);
+		inline static std::mutex s_callback_table_mutex;
 		inline static std::unordered_map<cloud_provider_session_token, std::vector<std::unique_ptr<functional::cloud_provider_callback>>> s_callbacks;
 	private:
-		std::wstring m_sync_root_dir;
+		std::filesystem::path m_sync_root_dir;
 		cloud_provider_session_token m_connection_key;
 		std::vector<std::unique_ptr<functional::cloud_provider_callback>> m_temporary_callback_table;
 
 		bool m_is_connected;
 	public:
-		cloud_provider_session(std::wstring_view sync_root_dir);
-		cloud_provider_session(const cloud_provider_session&) = delete;
-		cloud_provider_session(cloud_provider_session&& right);
-		cloud_provider_session& operator=(const cloud_provider_session&) = delete;
-		cloud_provider_session& operator=(cloud_provider_session&& right);
+		cloud_provider_session(const std::filesystem::path& sync_root_dir);
+		cloud_provider_session(const cloud_provider_session& lhs) = delete;
+		cloud_provider_session(cloud_provider_session&& rhs);
+		cloud_provider_session& operator=(const cloud_provider_session& lhs) = delete;
+		cloud_provider_session& operator=(cloud_provider_session&& rhs);
 		virtual ~cloud_provider_session() noexcept;
 
-		template <functional::cloud_provider_callback_type T>
-		void register_callback(const functional::specialized_cloud_provider_callback<T>& callback) {
-			auto type = callback.get_type();
-			auto xitr = std::find_if(this->m_temporary_callback_table.begin(), this->m_temporary_callback_table.end(), [type](const decltype(this->m_temporary_callback_table)::value_type& ptr) {
-				return ptr->get_type() == type;
-			});
-			if (xitr != this->m_temporary_callback_table.end()) {
-				throw functional::callback_duplication_exception(callback.get_type(), "The callback for the specified type has been already registered.");
-			}
-
-			this->m_temporary_callback_table.push_back(std::make_unique<functional::specialized_cloud_provider_callback<T>>(callback));
+		template <functional::cloud_provider_callback_type T, class C>
+		requires std::same_as<std::remove_cvref_t<C>, functional::specialized_cloud_provider_callback<T>>
+		void register_callback(C&& callback) {
+			this->register_callback(std::make_unique<functional::specialized_cloud_provider_callback<T>>(std::forward<C>(callback)));
 		}
+
+		void register_callback(std::unique_ptr<functional::cloud_provider_callback> callback);
 
 		void connect();
 		void disconnect();
 
-		std::wstring_view get_sync_root_dir() const noexcept;
+		const std::filesystem::path& get_sync_root_dir() const noexcept;
 		cloud_provider_session_token get_connection_key() const noexcept;
 	};
 }

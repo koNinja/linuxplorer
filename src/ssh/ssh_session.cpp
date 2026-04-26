@@ -1,5 +1,3 @@
-#define USE_SSH_INTERNAL_LIBRARIES
-
 #include <ssh/ssh_session.hpp>
 #include <ssh/ssh_exception.hpp>
 #include <ssh/internal/ssh_library_resource_manager.hpp>

@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <filesystem>
+#include <span>
 
 namespace linuxplorer::shell::filesystem {
 	struct LINUXPLORER_SHELL_API file_times {
@@ -54,26 +55,26 @@ namespace linuxplorer::shell::filesystem {
 
 	class LINUXPLORER_SHELL_API placeholder_creation_info {
 	private:
-		std::wstring m_relative_path;
+		std::filesystem::path m_relative_path;
 		std::size_t m_file_size;
 		file_times m_file_times;
 		std::uint32_t m_file_attributes;
 		std::vector<std::byte> m_identity;
 	public:
 		placeholder_creation_info(
-			std::wstring_view relative_path,
+			const std::filesystem::path& relative_path,
 			std::size_t file_size,
 			std::uint32_t file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE
 		) : m_relative_path(relative_path), m_file_size(file_size), m_file_attributes(file_attributes) {};
 
 		placeholder_creation_info(
-			std::wstring_view relative_path,
+			const std::filesystem::path& relative_path,
 			std::size_t file_size,
 			std::uint32_t file_attributes,
 			const file_times& times
 		) : m_relative_path(relative_path), m_file_size(file_size), m_file_attributes(file_attributes), m_file_times(times) {};
 
-		std::wstring_view get_relative_path() const noexcept {
+		const std::filesystem::path& get_relative_path() const noexcept {
 			return this->m_relative_path;
 		}
 		
@@ -89,7 +90,7 @@ namespace linuxplorer::shell::filesystem {
 			return this->m_file_times;
 		}
 
-		const std::vector<std::byte>& get_identity() const noexcept {
+		std::span<const std::byte> get_identity() const noexcept {
 			return this->m_identity;
 		}
 

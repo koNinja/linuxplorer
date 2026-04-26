@@ -56,6 +56,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 	LINUXPLORER_SSH_API std::uintmax_t remove_all(const sftp_session& session, const std::filesystem::path& path);
 	LINUXPLORER_SSH_API std::filesystem::file_time_type last_write_time(const sftp_session& session, const std::filesystem::path& path);
 	LINUXPLORER_SSH_API std::filesystem::file_time_type last_access_time(const sftp_session& session, const std::filesystem::path& path);
+	LINUXPLORER_SSH_API bool exists(const sftp_session& session, const std::filesystem::path& path);
 }
 
 #endif // LINUXPLORER_SFTP_MANIP_HPP_

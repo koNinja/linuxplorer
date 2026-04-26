@@ -4,18 +4,19 @@ if (NOT WIN32)
 	message(FATAL_ERROR "Linuxplorer is only supported on Windows.")
 endif()
 
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD 23)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(linuxplorer VERSION 1.1.1 LANGUAGES CXX)
+project(linuxplorer VERSION 2.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
 set(LINUXPLORER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(LINUXPLORER_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 set(LINUXPLORER_APP_DIR ${PROJECT_SOURCE_DIR}/app)
+set(LINUXPLORER_TEST_DIR ${PROJECT_SOURCE_DIR}/test)
 
 find_package(OpenSSL REQUIRED)
 find_package(GTest CONFIG REQUIRED)
@@ -34,7 +35,7 @@ include_directories(${LINUXPLORER_INCLUDE_DIR})
 
 add_subdirectory(${LINUXPLORER_SOURCE_DIR})
 add_subdirectory(${LINUXPLORER_APP_DIR})
-add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+add_subdirectory(${LINUXPLORER_TEST_DIR})
 
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VENDOR "koNinja")

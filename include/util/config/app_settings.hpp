@@ -5,11 +5,13 @@
 #include <util/config/config_exception.hpp>
 #include <shared_mutex>
 #include <fstream>
+#include <filesystem>
 #include <nlohmann/json.hpp>
 
 namespace linuxplorer::util::config {
 	class LINUXPLORER_CONFIG_API configuration_manager {
 	private:
+		inline static std::shared_mutex s_mutex;
 		inline static std::optional<nlohmann::json> s_config_json;
 	public:
 		configuration_manager() = delete;
@@ -17,11 +19,17 @@ namespace linuxplorer::util::config {
 		template <class T>
 		static T get_value(std::string_view name) {
 			try {
+				std::shared_lock lock(s_mutex);
 				if (!s_config_json) {
-					std::ifstream ifs;
-					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-					ifs.open(get_config_path());
-					s_config_json = nlohmann::json::parse(ifs);
+					lock.unlock();
+					{
+						std::unique_lock ulock(s_mutex);
+						std::ifstream ifs;
+						ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+						ifs.open(get_config_path());
+						s_config_json = nlohmann::json::parse(ifs);
+					}
+					lock.lock();
 				}
 
 				return (*s_config_json)[name].get<T>();
@@ -41,7 +49,9 @@ namespace linuxplorer::util::config {
 		template <class T>
 		static void set_value(std::string_view name, const T& value) {
 			try {
+				std::unique_lock lock(s_mutex);
 				if (!s_config_json) {
+					std::unique_lock ulock(s_mutex);
 					std::ifstream ifs;
 					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 					ifs.open(get_config_path());
@@ -69,11 +79,17 @@ namespace linuxplorer::util::config {
 
 		static bool has_value(std::string_view name) {
 			try {
+				std::shared_lock lock(s_mutex);
 				if (!s_config_json) {
-					std::ifstream ifs;
-					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-					ifs.open(get_config_path());
-					s_config_json = nlohmann::json::parse(ifs);
+					lock.unlock();
+					{
+						std::unique_lock ulock(s_mutex);
+						std::ifstream ifs;
+						ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+						ifs.open(get_config_path());
+						s_config_json = nlohmann::json::parse(ifs);
+					}
+					lock.lock();
 				}
 
 				return s_config_json->contains(name);
@@ -92,10 +108,10 @@ namespace linuxplorer::util::config {
 
 		static void initialize();
 
-		static std::wstring get_root_path();
-		static std::wstring get_config_path();
-		static std::wstring get_log_path();
-		static std::wstring get_install_path();
+		static std::filesystem::path get_root_path();
+		static std::filesystem::path get_config_path();
+		static std::filesystem::path get_log_path();
+		static std::filesystem::path get_install_path();
 	};
 
 	template <class T, class S>
