@@ -9,18 +9,19 @@
 
 namespace linuxplorer::lxpsvc::workers {
 	shell::functional::specialized::fetch_data_operation_info callback_table::on_fetch_data(const shell::functional::specialized::fetch_data_callback_parameters& parameters) {
-		LOG_INFO(
-			this->m_logger,
-			"Data fetch requested for '{}', offset: {}, length: {}",
-			parameters.get_absolute_placeholder_path(),
-			parameters.get_offset(),
-			parameters.get_length()
-		);
-
 		auto operation = this->m_execution_context.get_factory().create_with_cancellation<models::operations::hydration_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path),
 			models::range<std::size_t>(parameters.get_offset(), parameters.get_length())
+		);
+
+		LOG_INFO(
+			this->m_logger,
+			"Data fetch requested for '{}', offset: {}, length: {} (Operation #{})",
+			parameters.get_absolute_placeholder_path(),
+			parameters.get_offset(),
+			parameters.get_length(),
+			operation->get_id()
 		);
 
 		{
@@ -52,12 +53,12 @@ namespace linuxplorer::lxpsvc::workers {
 	}
 
 	shell::functional::specialized::fetch_placeholders_operation_info callback_table::on_fetch_placeholders(const shell::functional::callback_parameters& parameters) {
-		LOG_INFO(this->m_logger, "Placeholder fetch requested for '{}'.", parameters.get_absolute_placeholder_path());
-
 		auto operation = std::make_unique<models::operations::population_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path)
 		);
+
+		LOG_INFO(this->m_logger, "Placeholder fetch requested for '{}'. (Operation #{})", parameters.get_absolute_placeholder_path(), operation->get_id());
 
 		{
 			std::unique_lock lock(this->m_cancellable_map_mutex);
@@ -85,12 +86,12 @@ namespace linuxplorer::lxpsvc::workers {
 	}
 
 	shell::functional::specialized::delete_operation_info callback_table::on_deleted(const shell::functional::specialized::delete_callback_parameters& parameters) {
-		LOG_INFO(this->m_logger, "Deletion requested for '{}'.", parameters.get_absolute_placeholder_path());
-
 		auto operation = std::make_unique<models::operations::deletion_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path)
 		);
+
+		LOG_INFO(this->m_logger, "Deletion requested for '{}'. (Operation #{})", parameters.get_absolute_placeholder_path(), operation->get_id());
 		
 		auto adapter = operation->get_adapter().lock();
 
@@ -102,17 +103,18 @@ namespace linuxplorer::lxpsvc::workers {
 	}
 
 	shell::functional::operation_info callback_table::on_renamed(const shell::functional::specialized::rename_callback_parameters& parameters) {
-		LOG_INFO(
-			this->m_logger,
-			"Renaming requested for '{}' to '{}'.",
-			parameters.get_absolute_placeholder_path(),
-			parameters.get_absolute_new_path()
-		);
-
 		auto operation = std::make_unique<models::operations::renaming_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path),
 			parameters.get_absolute_new_path()
+		);
+
+		LOG_INFO(
+			this->m_logger,
+			"Renaming requested for '{}' to '{}'. (Operation #{})",
+			parameters.get_absolute_placeholder_path(),
+			parameters.get_absolute_new_path(),
+			operation->get_id()
 		);
 		
 		auto adapter = operation->get_adapter().lock();

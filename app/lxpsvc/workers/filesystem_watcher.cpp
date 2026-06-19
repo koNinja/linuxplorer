@@ -116,7 +116,9 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 
 		this->m_surveillance_overlapped.emplace(std::move(directory_handle));
+	}
 
+	void filesystem_watcher::start() {
 		this->m_watcher_thread = std::thread(&filesystem_watcher::watch_actions, this);
 	}
 

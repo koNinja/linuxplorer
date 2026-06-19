@@ -4,12 +4,12 @@ if (NOT WIN32)
 	message(FATAL_ERROR "Linuxplorer is only supported on Windows.")
 endif()
 
+project(linuxplorer VERSION 2.0.0 LANGUAGES CXX)
+
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-project(linuxplorer VERSION 2.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 

@@ -10,7 +10,8 @@ namespace linuxplorer::lxpsvc::models::requests::local {
 			pin,
 			unpin,
 			mark_in_sync,
-			unmark_in_sync
+			unmark_in_sync,
+			enable_placeholder_enumeration
 		};
 
 	private:

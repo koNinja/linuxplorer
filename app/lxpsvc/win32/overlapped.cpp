@@ -24,9 +24,7 @@ namespace linuxplorer::lxpsvc::win32 {
 
 	overlapped::~overlapped() {
 		try {
-			constexpr auto wait_timeout = std::chrono::milliseconds(5 * 1000);
 			this->request_cancel();
-			this->wait_for(wait_timeout);
 		}
 		catch (...) {}
 	}

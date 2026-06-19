@@ -57,6 +57,7 @@ namespace linuxplorer::lxpsvc::services {
 	public:
 		profile_runtime(const util::config::profile& profile);
 
+		void start();
 		void request_stop() noexcept;
 		void wait() noexcept;
 

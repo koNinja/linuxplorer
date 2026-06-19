@@ -33,6 +33,7 @@
 
 # Preferences
 .vscode
+.vs
 .cache
 .clangd
 cert.json

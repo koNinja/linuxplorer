@@ -19,6 +19,8 @@
 #include <atomic>
 #include <list>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <quill/Logger.h>
 
@@ -33,6 +35,12 @@ namespace linuxplorer::lxpsvc::workers {
 	private:
 		class request_visitor {
 		private:
+			const ssh::sftp::sftp_session& m_sftp_session;
+			const shell::cloud_provider_session& m_cloud_provider_session;
+			quill::Logger* m_logger;
+			helpers::path_helper m_path_helper;
+			std::list<win32::overlapped>& m_pending_hydrations;
+
 			struct stream_cache_wrapper {
 			public:
 				inline static constexpr std::size_t s_cache_capacity = 10;
@@ -51,11 +59,36 @@ namespace linuxplorer::lxpsvc::workers {
 				}
 			} m_stream_cache;
 
-			const ssh::sftp::sftp_session& m_sftp_session;
-			const shell::cloud_provider_session& m_cloud_provider_session;
-			quill::Logger* m_logger;
-			helpers::path_helper m_path_helper;
-			std::list<win32::overlapped>& m_pending_hydrations;
+			struct population_cache_wrapper {
+			private:
+				std::unordered_map<win32::file_reference_number, std::unordered_set<std::filesystem::path>> m_existent_files_in_server;
+				std::unordered_map<win32::file_reference_number, std::vector<shell::filesystem::placeholder_creation_info>> m_existent_file_metadata_cache;
+			public:
+				population_cache_wrapper() = default;
+
+				std::unordered_set<std::filesystem::path>* get_existent_file_set(const win32::file_reference_number& directory_frn) {
+					return this->m_existent_files_in_server.contains(directory_frn) ? &this->m_existent_files_in_server[directory_frn] : nullptr;
+				}
+				void set_existent_file_set(const win32::file_reference_number& directory_frn, std::unordered_set<std::filesystem::path>&& set) {
+					this->m_existent_files_in_server[directory_frn] = std::move(set);
+				}
+				bool erase_existent_file_set(const win32::file_reference_number& directory_frn) {
+					return this->m_existent_files_in_server.erase(directory_frn);
+				}
+
+				std::vector<shell::filesystem::placeholder_creation_info>* get_existent_file_metadata(const win32::file_reference_number& directory_frn) {
+					return this->m_existent_file_metadata_cache.contains(directory_frn) ? &this->m_existent_file_metadata_cache[directory_frn] : nullptr;
+				}
+				void set_existent_file_metadata(const win32::file_reference_number& directory_frn, std::vector<shell::filesystem::placeholder_creation_info>&& map) {
+					this->m_existent_file_metadata_cache[directory_frn] = std::move(map);
+				}
+				void push_existent_file_metadata(const win32::file_reference_number& directory_frn, shell::filesystem::placeholder_creation_info&& metadata) {
+					this->m_existent_file_metadata_cache[directory_frn].push_back(std::move(metadata));
+				}
+				bool erase_existent_file_metadata(const win32::file_reference_number& directory_frn) {
+					return this->m_existent_file_metadata_cache.erase(directory_frn);
+				}
+			} m_population_cache;
 		public:
 			request_visitor(
 				const ssh::sftp::sftp_session& sftp_session,
@@ -88,9 +121,9 @@ namespace linuxplorer::lxpsvc::workers {
 		std::mutex& m_sftp_mutex;
 		quill::Logger* m_logger;
 
-		request_visitor m_visitor;
-
 		std::list<win32::overlapped> m_pending_hydrations;
+
+		request_visitor m_visitor;
 	public:
 		operation_executor(
 			const ssh::sftp::sftp_session& sftp_session,
@@ -100,6 +133,8 @@ namespace linuxplorer::lxpsvc::workers {
 			quill::Logger* logger
 		);
 		virtual ~operation_executor();
+
+		void start();
 
 		void request_stop() noexcept;
 		void wait() noexcept;

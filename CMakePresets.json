@@ -1,0 +1,43 @@
+{
+	"version": 3,
+	"configurePresets": [
+		{
+			"name": "win-x64-debug",
+			"displayName": "x64 Debug",
+			"description": "Sets Ninja generator, compilers, x64 architecture, build and install directory, debug build type",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"VCPKG_APPLOCAL_DEPS": "ON",
+				"VCPKG_MANIFEST_MODE": "ON",
+				"VCPKG_TARGET_TRIPLET": "x64-windows"
+			},
+			"vendor": {
+				"microsoft.com/VisualStudioSettings/CMake/1.0": {
+					"hostOS": [ "Windows" ]
+				}
+			}
+		},
+		{
+			"name": "win-x64-release",
+			"displayName": "x64 Release",
+			"description": "Sets Ninja generator, compilers, x64 architecture, build and install directory, debug build type",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"VCPKG_APPLOCAL_DEPS": "ON",
+				"VCPKG_MANIFEST_MODE": "ON",
+				"VCPKG_TARGET_TRIPLET": "x64-windows"
+			},
+			"vendor": {
+				"microsoft.com/VisualStudioSettings/CMake/1.0": {
+					"hostOS": [ "Windows" ]
+				}
+			}
+		}
+	]
+}

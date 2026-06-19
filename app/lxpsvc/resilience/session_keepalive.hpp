@@ -43,6 +43,7 @@ namespace linuxplorer::lxpsvc::resilience {
 		);
 		virtual ~session_keeper();
 
+		void start();
 		void request_stop() noexcept;
 		void wait() noexcept;
 		

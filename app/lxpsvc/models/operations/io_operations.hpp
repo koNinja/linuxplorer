@@ -38,8 +38,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		lower,
 		normal,
 		higher,
-		immediate,
-		interruptive
+		immediate
 	};
 
 	enum class operation_result {
@@ -88,7 +87,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 			m_priority(priority),
 			m_result(operation_result::pending),
 			m_absolute_path(syncroot / relative_path),
-			m_path_helper(syncroot)
+			m_path_helper(syncroot),
+			m_attempts(0)
 		{
 			this->m_stop_source = std::make_shared<std::stop_source>();
 			this->m_stop_token = this->m_stop_source->get_token();
@@ -198,10 +198,10 @@ namespace linuxplorer::lxpsvc::models::operations {
 		void set_state(state_type new_state, std::memory_order order = std::memory_order::seq_cst) noexcept {
 			this->m_state.store(new_state, order);
 		}
-		bool weakly_compare_exchange_state(state_type& expected, state_type desired, std::memory_order order = std::memory_order::seq_cst) noexcept {
+		bool weakly_compare_and_swap_state(state_type& expected, state_type desired, std::memory_order order = std::memory_order::seq_cst) noexcept {
 			return this->m_state.compare_exchange_weak(expected, desired, order);
 		}
-		bool strongly_compare_exchange_state(state_type& expected, state_type desired, std::memory_order order = std::memory_order::seq_cst) noexcept {
+		bool strongly_compare_and_swap_state(state_type& expected, state_type desired, std::memory_order order = std::memory_order::seq_cst) noexcept {
 			return this->m_state.compare_exchange_strong(expected, desired, order);
 		}
 
@@ -245,8 +245,9 @@ namespace linuxplorer::lxpsvc::models::operations {
 			committing_child
 		);
 		DECLARE_STATE_TRAITS(hydration_operation, downloading);
-		DECLARE_STATE_TRAITS(population_operation, enumerating);
+		DECLARE_STATE_TRAITS(population_operation, enumerating, cleaning_up, metadata_comitting);
 		DECLARE_STATE_TRAITS(attribute_operation, applying, committing);
+		DECLARE_STATE_TRAITS(directory_update_operation, committing);
 	}
 
 	class creation_operation : public stateful_io_operation<internal::creation_operation_state_traits> {
@@ -412,6 +413,17 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual bool should_execute() const override;
 
 		virtual ~attribute_operation() = default;
+	};
+
+	class directory_update_operation : public stateful_io_operation<internal::directory_update_operation_state_traits> {
+	protected:
+		virtual void transition_on_success() noexcept override;
+	public:
+		directory_update_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
+
+		virtual request_variant_t fetch() const override;
+
+		virtual ~directory_update_operation() = default;
 	};
 }
 
