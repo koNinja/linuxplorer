@@ -9,10 +9,9 @@
 namespace linuxplorer::lxpsvc::models::requests {
 	class io_request {
 	private:
-		std::stop_token m_stop_token;
 		std::filesystem::path m_absolute_path;
 	protected:
-		io_request(const std::filesystem::path& absolute_path, const std::stop_token& stop_token) : m_absolute_path(absolute_path), m_stop_token(stop_token)
+		io_request(const std::filesystem::path& absolute_path) : m_absolute_path(absolute_path)
 		{}
 	public:
 		io_request(const io_request& lhs) = delete;
@@ -24,10 +23,6 @@ namespace linuxplorer::lxpsvc::models::requests {
 		const std::filesystem::path& get_absolute_path() const noexcept {
 			return this->m_absolute_path;
 		}
-
-		bool has_cancel_requested() const noexcept {
-			return this->m_stop_token.stop_requested();
-		}
 	};
 
 	template <class result_t = void>
@@ -35,8 +30,8 @@ namespace linuxplorer::lxpsvc::models::requests {
 	private:
 		result_adapter<result_t>& m_adapter;
 	protected:
-		synchronous_io_request(const std::filesystem::path& absolute_path, result_adapter<result_t>& adapter, const std::stop_token& stop_token) :
-			io_request(absolute_path, stop_token), m_adapter(adapter)
+		synchronous_io_request(const std::filesystem::path& absolute_path, result_adapter<result_t>& adapter) :
+			io_request(absolute_path), m_adapter(adapter)
 		{}
 	public:
 		template <class T>
@@ -55,8 +50,8 @@ namespace linuxplorer::lxpsvc::models::requests {
 	private:
 		result_adapter<void>& m_adapter;
 	public:
-		synchronous_io_request(const std::filesystem::path& absolute_path, result_adapter<void>& adapter, const std::stop_token& stop_token) :
-			io_request(absolute_path, stop_token), m_adapter(adapter)
+		synchronous_io_request(const std::filesystem::path& absolute_path, result_adapter<void>& adapter) :
+			io_request(absolute_path), m_adapter(adapter)
 		{}
 
 		void set_value() {

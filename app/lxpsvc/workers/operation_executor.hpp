@@ -97,16 +97,16 @@ namespace linuxplorer::lxpsvc::workers {
 				quill::Logger* logger
 			);
 
-			models::requests::request_result operator()(models::requests::remote::creation_request& request);
-			models::requests::request_result operator()(models::requests::remote::modification_request& request);
-			models::requests::request_result operator()(models::requests::remote::deletion_request& request);
-			models::requests::request_result operator()(models::requests::remote::renaming_request& request);
-			models::requests::request_result operator()(models::requests::remote::hydration_request& request);
-			models::requests::request_result operator()(models::requests::remote::population_request& request);
-			models::requests::request_result operator()(models::requests::local::attribute_request& request);
-			models::requests::request_result operator()(models::requests::local::transform_request& request);
-			models::requests::request_result operator()(models::requests::local::dehydration_request& request);
-			models::requests::request_result operator()(models::requests::local::hydration_triggering_request& request);
+			models::requests::request_result operator()(models::requests::remote::creation_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::modification_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::deletion_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::renaming_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::hydration_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::population_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::attribute_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::transform_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::dehydration_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::hydration_triggering_request& request, std::stop_token token);
 		};
 	private:
 		std::atomic<operation_executor_state> m_executor_state;

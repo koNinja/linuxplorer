@@ -73,7 +73,7 @@ namespace linuxplorer::lxpsvc::workers {
 			if (FAILED(hr)) return hr;
 		}
 		else {
-			PropVariantInit(&property_variant);
+			::PropVariantInit(&property_variant);
 		}
 
 		hr = extrinstic_property_store->SetValue(PKEY_LastSyncWarning, property_variant);
@@ -97,7 +97,7 @@ namespace linuxplorer::lxpsvc::workers {
 		m_pending_hydrations(pending_hydrations)
 	{}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::creation_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::creation_request& request, std::stop_token token) {
 		try {
 			switch (request.get_type()) {
 			case std::filesystem::file_type::directory:
@@ -140,7 +140,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 	
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::modification_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::modification_request& request, std::stop_token token) {
 		const auto& server_path = request.get_absolute_path();
 		auto absolute_client_path = this->m_path_helper.to_win_style(helpers::style_conversion_class::absolute_format, server_path);
 
@@ -251,7 +251,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::deletion_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::deletion_request& request, std::stop_token token) {
 		try {
 			auto absolute_client_path = this->m_path_helper.to_win_style(helpers::style_conversion_class::absolute_format, request.get_absolute_path());
 			auto frn = win32::get_frn(absolute_client_path);
@@ -285,7 +285,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::renaming_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::renaming_request& request, std::stop_token token) {
 		const auto& old_server_path = request.get_absolute_path();
 		const auto& new_server_path = request.get_absolute_new_path();
 		auto absolute_old_client_path = this->m_path_helper.to_win_style(helpers::style_conversion_class::absolute_format, old_server_path);
@@ -323,7 +323,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::hydration_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::hydration_request& request, std::stop_token token) {
 		const auto& server_path = request.get_absolute_path();
 		auto absolute_client_path = this->m_path_helper.to_win_style(helpers::style_conversion_class::absolute_format, server_path);
 
@@ -379,7 +379,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::population_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::population_request& request, std::stop_token token) {
 		auto absolute_client_path = this->m_path_helper.to_win_style(helpers::style_conversion_class::absolute_format, request.get_absolute_path()).lexically_normal();
 
 		std::vector<shell::filesystem::placeholder_creation_info> info;
@@ -404,7 +404,7 @@ namespace linuxplorer::lxpsvc::workers {
 			int	skipped = 0;
 
 			for (const auto& entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session, request.get_absolute_path())) {
-				if (request.has_cancel_requested()) {
+				if (token.stop_requested()) {
 					request.set_exception(shell::functional::callback_abort_exception(ERROR_CLOUD_FILE_REQUEST_CANCELED));
 					LOG_INFO(this->m_logger, "The cancellation for this placeholder enumeration has been accepted.");
 					return models::requests::request_result::cancelled;
@@ -510,7 +510,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::attribute_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::attribute_request& request, std::stop_token token) {
 		try {
 			shell::filesystem::cloud_filter_placeholder placeholder(request.get_absolute_path());
 
@@ -563,7 +563,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::transform_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::transform_request& request, std::stop_token token) {
 		try {
 			shell::filesystem::cloud_filter_placeholder::transform(
 				request.get_absolute_path(),
@@ -587,7 +587,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::dehydration_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::dehydration_request& request, std::stop_token token) {
 		try {
 			shell::filesystem::file_placeholder placeholder(request.get_absolute_path());
 			placeholder.dehydrate_unsafe();
@@ -609,7 +609,7 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 	}
 
-	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::hydration_triggering_request& request) {
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::hydration_triggering_request& request, std::stop_token token) {
 		win32::unique_file_handle file = ::CreateFileW(
 			request.get_absolute_path().c_str(),
 			FILE_READ_ATTRIBUTES,

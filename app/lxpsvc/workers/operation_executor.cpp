@@ -158,9 +158,14 @@ namespace linuxplorer::lxpsvc::workers {
 						nullable_task->transition(models::requests::request_result::cancelled);
 						break;
 					}
-
+					
 					auto any_request = nullable_task->fetch();
-					models::requests::request_result result = std::visit(this->m_visitor, any_request);
+					models::requests::request_result result = std::visit(
+						[this, &nullable_task](auto&& request) {
+							return this->m_visitor(request, nullable_task->get_stop_token());
+						},
+						any_request
+					);
 					nullable_task->transition(result);
 
 					bool need_to_exit_loop = false;

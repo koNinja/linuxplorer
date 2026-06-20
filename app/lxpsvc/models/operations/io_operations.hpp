@@ -5,6 +5,7 @@
 #include "../requests/remote/remote_requests.hpp"
 #include "../requests/local/local_requests.hpp"
 #include "../requests/result_adapter.hpp"
+#include "../requests/result_drain.hpp"
 #include "../../helpers/path_helper.hpp"
 
 #include <cstddef>
@@ -79,7 +80,6 @@ namespace linuxplorer::lxpsvc::models::operations {
 		helpers::path_helper m_path_helper;
 		operation_result m_result;
 		std::shared_ptr<cancellation_context> m_cancellation;
-		std::stop_token m_stop_token;
 
 		std::uint32_t m_attempts;
 	public:
@@ -94,10 +94,9 @@ namespace linuxplorer::lxpsvc::models::operations {
 			m_result(operation_result::pending),
 			m_absolute_path(syncroot / relative_path),
 			m_path_helper(syncroot),
-			m_attempts(0)
+			m_attempts(0),
+			m_cancellation(cancellation_context)
 		{
-			this->m_cancellation = cancellation_context;
-			if (this->m_cancellation) this->m_stop_token = this->m_cancellation->get_stop_token();
 		}
 
 		io_operation(const io_operation& lhs) = delete;
@@ -158,8 +157,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 			}
 		}
 
-		const std::stop_token& get_stop_token() const noexcept {
-			return this->m_stop_token;
+		std::stop_token get_stop_token() const noexcept {
+			return this->m_cancellation ? this->m_cancellation->get_stop_token() : std::stop_token();
 		}
 
 		std::uint32_t get_current_attempts() const noexcept {
@@ -245,7 +244,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		DECLARE_STATE_TRAITS(hydration_operation, downloading);
 		DECLARE_STATE_TRAITS(population_operation, enumerating, cleaning_up, metadata_comitting);
 		DECLARE_STATE_TRAITS(attribute_operation, applying, committing);
-		DECLARE_STATE_TRAITS(directory_update_operation, committing);
+		DECLARE_STATE_TRAITS(directory_update_operation, enumerating, metadata_comitting, creating_new, cleaning_up, committing);
 	}
 
 	class creation_operation : public stateful_io_operation<internal::creation_operation_state_traits> {
@@ -322,7 +321,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 	};
 
 	/*
-		Note: This class represents moveing into the syncroot tree, and it's used by only filesystem_watcher.
+		Note: This class represents moving into the syncroot tree, and it's used by only filesystem_watcher.
 	*/
 	class import_operation : public stateful_io_operation<internal::import_operation_state_traits> {
 	private:
@@ -411,6 +410,19 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual bool should_execute() const override;
 
 		virtual ~attribute_operation() = default;
+	};
+
+	class directory_update_operation : public stateful_io_operation<internal::directory_update_operation_state_traits> {
+	private:
+		requests::result_drain<std::vector<shell::filesystem::placeholder_creation_info>> m_enumerated_entries;
+	protected:
+		virtual void transition_on_success() noexcept override;
+	public:
+		directory_update_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
+
+		virtual request_variant_t fetch() const override;
+
+		virtual ~directory_update_operation() = default;
 	};
 }
 

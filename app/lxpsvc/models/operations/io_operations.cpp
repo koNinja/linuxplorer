@@ -16,16 +16,14 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::creating:
 			return requests::remote::creation_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				this->m_type,
-				this->get_stop_token()
+				this->m_type
 			);
 		case state_type::transforming:
-			return requests::local::transform_request(this->get_absolute_path(), this->m_identity, this->get_stop_token());
+			return requests::local::transform_request(this->get_absolute_path(), this->m_identity);
 		case state_type::committing:
 			return requests::local::attribute_request(
 				this->get_absolute_path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
@@ -142,11 +140,10 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::modification_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				this->m_ranges->at(this->m_current_range_index),
-				this->m_type,
-				this->get_stop_token()
+				this->m_type
 			);
 		case state_type::committing:
-			return requests::local::attribute_request(this->get_absolute_path(), requests::local::attribute_request::change_domain::mark_in_sync, this->get_stop_token());
+			return requests::local::attribute_request(this->get_absolute_path(), requests::local::attribute_request::change_domain::mark_in_sync);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
 		}
@@ -206,8 +203,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		{
 			return requests::remote::deletion_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		default:
@@ -261,24 +257,21 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::renaming_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				this->get_path_helper().to_linux_style(this->m_absolute_new_path, helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		case state_type::deleting:
 		{
 			return requests::remote::deletion_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		case state_type::committing:
 		{
 			return requests::local::attribute_request(
 				this->get_absolute_path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		}
 		default:
@@ -340,14 +333,12 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::creating:
 			return requests::remote::creation_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				std::filesystem::status(this->get_absolute_path()).type(),
-				this->get_stop_token()
+				std::filesystem::status(this->get_absolute_path()).type()
 			);
 		case state_type::transforming:
 			return requests::local::transform_request(
 				this->get_absolute_path(),
-				{ std::byte{0} }, // dummy FileIdentity blob
-				this->get_stop_token()
+				{ std::byte{0} } // dummy FileIdentity blob
 			);
 		case state_type::uploading:
 		{
@@ -357,27 +348,23 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::modification_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				range(offset, length),
-				requests::remote::modification_type::appended,
-				this->get_stop_token()
+				requests::remote::modification_type::appended
 			);
 		}
 		case state_type::committing:
 			return requests::local::attribute_request(
 				this->get_absolute_path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		case state_type::creating_child:
 			return requests::remote::creation_request(
 				this->get_path_helper().to_linux_style(this->m_rditr->path(), helpers::style_conversion_class::absolute_format),
-				this->m_rditr->status().type(),
-				this->get_stop_token()
+				this->m_rditr->status().type()
 			);
 		case state_type::transforming_child:
 			return requests::local::transform_request(
 				this->m_rditr->path(),
-				{ std::byte{0} },
-				this->get_stop_token()
+				{ std::byte{0} }
 			);
 		case state_type::uploading_child:
 		{
@@ -387,15 +374,13 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::modification_request(
 				this->get_path_helper().to_linux_style(this->m_rditr->path(), helpers::style_conversion_class::absolute_format),
 				range(offset, length),
-				requests::remote::modification_type::appended,
-				this->get_stop_token()
+				requests::remote::modification_type::appended
 			);
 		}
 		case state_type::committing_child:
 			return requests::local::attribute_request(
 				this->m_rditr->path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
@@ -523,8 +508,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::hydration_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				range,
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		default:
@@ -577,8 +561,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::enumerating:
 			return requests::remote::population_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
@@ -651,9 +634,9 @@ namespace linuxplorer::lxpsvc::models::operations {
 		{
 			switch (this->m_reason) {
 				case operation_reason::pinned:
-					return requests::local::hydration_triggering_request(this->get_absolute_path(), this->get_stop_token());
+					return requests::local::hydration_triggering_request(this->get_absolute_path());
 				case operation_reason::unpinned:
-					return requests::local::dehydration_request(this->get_absolute_path(), this->get_stop_token());
+					return requests::local::dehydration_request(this->get_absolute_path());
 				default:
 					throw not_implemented_exception("The reason for attribute change is not supported.");
 			}
@@ -663,8 +646,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			if (this->m_reason == operation_reason::unpinned) {
 				return requests::local::attribute_request(
 					this->get_absolute_path(),
-					requests::local::attribute_request::change_domain::mark_in_sync,
-					this->get_stop_token()
+					requests::local::attribute_request::change_domain::mark_in_sync
 				);
 			}
 			else [[fallthrough]];
@@ -757,5 +739,22 @@ namespace linuxplorer::lxpsvc::models::operations {
 		default:
 			return false;
 		}
+	}
+
+	directory_update_operation::directory_update_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation(operation_priority::lower, syncroot, relative_path, cancellation_context)
+	{
+		this->set_state(state_type::enumerating);
+	}
+
+	directory_update_operation::request_variant_t directory_update_operation::fetch() const {
+		switch (this->get_state()) {
+		case state_type::enumerating:
+
+		}
+	}
+
+	void directory_update_operation::transition_on_success() noexcept {
+
 	}
 }
