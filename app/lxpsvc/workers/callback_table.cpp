@@ -62,7 +62,7 @@ namespace linuxplorer::lxpsvc::workers {
 
 		{
 			std::unique_lock lock(this->m_cancellable_map_mutex);
-			// maybe will be blocked...
+			// might be blocked...
 			this->m_cancellable_operations[win32::get_frn(parameters.get_absolute_placeholder_path())] = operation->get_id();
 		}
 		

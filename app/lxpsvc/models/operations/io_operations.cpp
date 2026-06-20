@@ -3,8 +3,8 @@
 #include <shell/filesystem/cloud_filter_placeholder.hpp>
 
 namespace linuxplorer::lxpsvc::models::operations {
-	creation_operation::creation_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path)
-		: stateful_io_operation<internal::creation_operation_state_traits>(operation_priority::lower, syncroot, relative_path), m_identity(1)
+	creation_operation::creation_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context)
+		: stateful_io_operation<internal::creation_operation_state_traits>(operation_priority::lower, syncroot, relative_path, cancellation_context), m_identity(1)
 	{
 		this->set_state(state_type::creating);
 		this->m_identity[0] = std::byte{0};
@@ -56,8 +56,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return true;
 	}
 
-	modification_operation::modification_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, models::requests::remote::modification_type type) :
-		stateful_io_operation<internal::modification_operation_state_traits>(operation_priority::lower, syncroot, relative_path),
+	modification_operation::modification_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, models::requests::remote::modification_type type, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::modification_operation_state_traits>(operation_priority::lower, syncroot, relative_path, cancellation_context),
 		m_current_range_index(0), m_type(type)
 	{
 		if (std::filesystem::is_directory(this->get_absolute_path())) {
@@ -193,8 +193,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return true;
 	}
 
-	deletion_operation::deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) : 
-		stateful_io_operation<internal::deletion_operation_state_traits>(operation_priority::higher, syncroot, relative_path)
+	deletion_operation::deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::deletion_operation_state_traits>(operation_priority::higher, syncroot, relative_path, cancellation_context)
 	{
 		this->set_state(state_type::deleting);
 		this->m_adapter = std::make_shared<requests::result_adapter<void>>();
@@ -240,8 +240,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	renaming_operation::renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_old_path, const std::filesystem::path& absolute_new_path) : 
-		stateful_io_operation<internal::renaming_operation_state_traits>(operation_priority::higher, syncroot, relative_old_path), 
+	renaming_operation::renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_old_path, const std::filesystem::path& absolute_new_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::renaming_operation_state_traits>(operation_priority::higher, syncroot, relative_old_path, cancellation_context), 
 		m_absolute_new_path(absolute_new_path)
 	{
 		this->m_adapter = std::make_shared<requests::result_adapter<void>>();
@@ -316,8 +316,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	import_operation::import_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
-		stateful_io_operation<internal::import_operation_state_traits>(operation_priority::lower, syncroot, relative_path)
+	import_operation::import_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::import_operation_state_traits>(operation_priority::lower, syncroot, relative_path, cancellation_context)
 	{
 		if (shell::filesystem::cloud_filter_placeholder::is_placeholder(this->get_absolute_path())) {
 			this->set_state(state_type::done);
@@ -416,7 +416,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			auto stat = std::filesystem::status(this->get_absolute_path(), ec);
 
 			if (ec || stat.type() != std::filesystem::file_type::regular) {
-				// unable to upload
+				// when unable to upload
 				this->set_state(state_type::committing);
 			}
 			else {
@@ -460,7 +460,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			auto stat = this->m_rditr->status(ec);
 
 			if (ec || stat.type() != std::filesystem::file_type::regular) {
-				// unable to upload
+				// when unable to upload
 				this->set_state(state_type::committing_child);
 			}
 			else {
@@ -507,8 +507,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return true;
 	}
 
-	hydration_operation::hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range) :
-		stateful_io_operation<internal::hydration_operation_state_traits>(operation_priority::normal, syncroot, relative_path),
+	hydration_operation::hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::hydration_operation_state_traits>(operation_priority::normal, syncroot, relative_path, cancellation_context),
 		m_range(range), m_remaining_length(range.get_length())
 	{
 		this->set_state(state_type::downloading);
@@ -565,8 +565,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	population_operation::population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
-		stateful_io_operation<internal::population_operation_state_traits>(operation_priority::higher, syncroot, relative_path)
+	population_operation::population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::population_operation_state_traits>(operation_priority::higher, syncroot, relative_path, cancellation_context)
 	{
 		this->set_state(state_type::enumerating);
 		this->m_adapter = std::make_shared<requests::result_adapter<result_t>>();
@@ -612,8 +612,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	attribute_operation::attribute_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
-		stateful_io_operation<internal::attribute_operation_state_traits>(operation_priority::immediate, syncroot, relative_path)
+	attribute_operation::attribute_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::attribute_operation_state_traits>(operation_priority::immediate, syncroot, relative_path, cancellation_context)
 	{
 		if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(this->get_absolute_path())) {
 			this->set_state(state_type::done);

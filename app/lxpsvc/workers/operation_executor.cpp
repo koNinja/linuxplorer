@@ -154,7 +154,7 @@ namespace linuxplorer::lxpsvc::workers {
 
 			while (!nullable_task->done()) {
 				try {
-					if (nullable_task->has_cancel_requested()) {
+					if (nullable_task->get_stop_token().stop_requested()) {
 						nullable_task->transition(models::requests::request_result::cancelled);
 						break;
 					}

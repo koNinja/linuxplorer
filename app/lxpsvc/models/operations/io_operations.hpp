@@ -1,6 +1,7 @@
 #ifndef LINUXPLORER_LXPSVC_IO_OPERATIONS_HPP_
 #define LINUXPLORER_LXPSVC_IO_OPERATIONS_HPP_
 
+#include "../cancellation_context.hpp"
 #include "../requests/remote/remote_requests.hpp"
 #include "../requests/local/local_requests.hpp"
 #include "../requests/result_adapter.hpp"
@@ -77,12 +78,17 @@ namespace linuxplorer::lxpsvc::models::operations {
 		std::filesystem::path m_absolute_path;
 		helpers::path_helper m_path_helper;
 		operation_result m_result;
-		std::shared_ptr<std::stop_source> m_stop_source;
+		std::shared_ptr<cancellation_context> m_cancellation;
 		std::stop_token m_stop_token;
 
 		std::uint32_t m_attempts;
 	public:
-		io_operation(operation_priority priority, const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
+		io_operation(
+			operation_priority priority,
+			const std::filesystem::path& syncroot,
+			const std::filesystem::path& relative_path,
+			std::shared_ptr<cancellation_context> cancellation_context = nullptr
+		) :
 			m_id(s_id_prefix.fetch_add(1, std::memory_order::relaxed)),
 			m_priority(priority),
 			m_result(operation_result::pending),
@@ -90,8 +96,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 			m_path_helper(syncroot),
 			m_attempts(0)
 		{
-			this->m_stop_source = std::make_shared<std::stop_source>();
-			this->m_stop_token = this->m_stop_source->get_token();
+			this->m_cancellation = cancellation_context;
+			if (this->m_cancellation) this->m_stop_token = this->m_cancellation->get_stop_token();
 		}
 
 		io_operation(const io_operation& lhs) = delete;
@@ -152,12 +158,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 			}
 		}
 
-		bool has_cancel_requested() const noexcept {
-			return this->m_stop_token.stop_requested();
-		}
-
-		std::weak_ptr<std::stop_source> get_stop_source() const noexcept {
-			return this->m_stop_source;
+		const std::stop_token& get_stop_token() const noexcept {
+			return this->m_stop_token;
 		}
 
 		std::uint32_t get_current_attempts() const noexcept {
@@ -177,10 +179,6 @@ namespace linuxplorer::lxpsvc::models::operations {
 
 		virtual bool should_execute() const {
 			return true;
-		}
-
-		const std::stop_token& get_stop_token() const noexcept {
-			return this->m_stop_token;
 		}
 	};
 
@@ -257,7 +255,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 	protected:
 		virtual void transition_on_success() noexcept override;
 	public:
-		creation_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
+		creation_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 		virtual bool should_execute() const override;
@@ -275,7 +273,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 	protected:
 		virtual void transition_on_success() noexcept override;
 	public:
-		modification_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, models::requests::remote::modification_type type);
+		modification_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, models::requests::remote::modification_type type, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 		virtual bool should_execute() const override;
@@ -291,7 +289,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual void transition_on_permanent_failure() noexcept override;
 		virtual void transition_on_cancelled() noexcept override;
 	public:
-		deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
+		deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 
@@ -314,7 +312,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual void transition_on_permanent_failure() noexcept override;
 		virtual void transition_on_cancelled() noexcept override;
 	public:
-		renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const std::filesystem::path& absolute_new_path);
+		renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const std::filesystem::path& absolute_new_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 
@@ -340,7 +338,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 	protected:
 		virtual void transition_on_success() noexcept override;
 	public:
-		import_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
+		import_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 		virtual bool should_execute() const override;
@@ -368,7 +366,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual void transition_on_permanent_failure() noexcept override;
 		virtual void transition_on_cancelled() noexcept override;
 	public:
-		hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range);
+		hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 
@@ -387,7 +385,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		virtual void transition_on_permanent_failure() noexcept override;
 		virtual void transition_on_cancelled() noexcept override;
 	public:
-		population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
+		population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 
@@ -407,23 +405,12 @@ namespace linuxplorer::lxpsvc::models::operations {
 	protected:
 		virtual void transition_on_success() noexcept override;
 	public:
-		attribute_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
+		attribute_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context = nullptr);
 
 		virtual request_variant_t fetch() const override;
 		virtual bool should_execute() const override;
 
 		virtual ~attribute_operation() = default;
-	};
-
-	class directory_update_operation : public stateful_io_operation<internal::directory_update_operation_state_traits> {
-	protected:
-		virtual void transition_on_success() noexcept override;
-	public:
-		directory_update_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path);
-
-		virtual request_variant_t fetch() const override;
-
-		virtual ~directory_update_operation() = default;
 	};
 }
 
