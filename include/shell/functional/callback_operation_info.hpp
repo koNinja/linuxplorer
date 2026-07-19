@@ -19,7 +19,7 @@ namespace linuxplorer::shell::functional {
 			std::size_t m_length;
 			std::vector<std::byte> m_buffer;
 		public:
-			using operation_info::operation_info;
+			fetch_data_operation_info_yielded() : operation_info(), m_offset(0), m_length(0), m_buffer() {}
 
 			std::size_t get_offset() const noexcept;
 			void set_offset(std::size_t offset) noexcept;

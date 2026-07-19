@@ -58,37 +58,6 @@ namespace linuxplorer::lxpsvc::workers {
 					return this->m_remote_ostream;
 				}
 			} m_stream_cache;
-
-			struct population_cache_wrapper {
-			private:
-				std::unordered_map<win32::file_reference_number, std::unordered_set<std::filesystem::path>> m_existent_files_in_server;
-				std::unordered_map<win32::file_reference_number, std::vector<shell::filesystem::placeholder_creation_info>> m_existent_file_metadata_cache;
-			public:
-				population_cache_wrapper() = default;
-
-				std::unordered_set<std::filesystem::path>* get_existent_file_set(const win32::file_reference_number& directory_frn) {
-					return this->m_existent_files_in_server.contains(directory_frn) ? &this->m_existent_files_in_server[directory_frn] : nullptr;
-				}
-				void set_existent_file_set(const win32::file_reference_number& directory_frn, std::unordered_set<std::filesystem::path>&& set) {
-					this->m_existent_files_in_server[directory_frn] = std::move(set);
-				}
-				bool erase_existent_file_set(const win32::file_reference_number& directory_frn) {
-					return this->m_existent_files_in_server.erase(directory_frn);
-				}
-
-				std::vector<shell::filesystem::placeholder_creation_info>* get_existent_file_metadata(const win32::file_reference_number& directory_frn) {
-					return this->m_existent_file_metadata_cache.contains(directory_frn) ? &this->m_existent_file_metadata_cache[directory_frn] : nullptr;
-				}
-				void set_existent_file_metadata(const win32::file_reference_number& directory_frn, std::vector<shell::filesystem::placeholder_creation_info>&& map) {
-					this->m_existent_file_metadata_cache[directory_frn] = std::move(map);
-				}
-				void push_existent_file_metadata(const win32::file_reference_number& directory_frn, shell::filesystem::placeholder_creation_info&& metadata) {
-					this->m_existent_file_metadata_cache[directory_frn].push_back(std::move(metadata));
-				}
-				bool erase_existent_file_metadata(const win32::file_reference_number& directory_frn) {
-					return this->m_existent_file_metadata_cache.erase(directory_frn);
-				}
-			} m_population_cache;
 		public:
 			request_visitor(
 				const ssh::sftp::sftp_session& sftp_session,
@@ -107,6 +76,8 @@ namespace linuxplorer::lxpsvc::workers {
 			models::requests::request_result operator()(models::requests::local::transform_request& request, std::stop_token token);
 			models::requests::request_result operator()(models::requests::local::dehydration_request& request, std::stop_token token);
 			models::requests::request_result operator()(models::requests::local::hydration_triggering_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::enumeration_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::directory_update_request& request, std::stop_token token);
 		};
 	private:
 		std::atomic<operation_executor_state> m_executor_state;

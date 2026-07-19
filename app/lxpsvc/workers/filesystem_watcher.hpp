@@ -56,6 +56,7 @@ namespace linuxplorer::lxpsvc::workers {
 		);
 
 		void raise_io_operations(const std::filesystem::path& relative_path, ::USN usn, std::uint32_t why);
+		bool try_raise_parent_directory_update_if(const std::filesystem::path& relative_path, const win32::file_reference_number& parent_frn);
 
 		bool auxiliarily_verify_execution_necessity_for_attribute(const std::filesystem::path& absolute_path) const noexcept;
 

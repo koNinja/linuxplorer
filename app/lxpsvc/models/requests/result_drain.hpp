@@ -27,10 +27,10 @@ namespace linuxplorer::lxpsvc::models::requests {
 			this->m_done.store(true, std::memory_order::release);
 		}
 
-		std::optional<T> try_get_value() {
-			if (!this->done()) return std::nullopt;
+		T* try_get_value() {
+			if (!this->done()) return nullptr;
 			std::unique_lock lock(this->m_mutex);
-			return this->m_result;
+			return this->m_result.has_value() ? &this->m_result.value() : nullptr;
 		}
 
 		bool done() const noexcept {

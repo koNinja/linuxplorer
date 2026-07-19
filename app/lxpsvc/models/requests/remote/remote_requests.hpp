@@ -3,6 +3,7 @@
 
 #include "../io_requests.hpp"
 #include "../../data_range.hpp"
+#include "../result_drain.hpp"
 
 #include <shell/filesystem/placeholder_info.hpp>
 
@@ -96,7 +97,15 @@ namespace linuxplorer::lxpsvc::models::requests::remote {
 	*/
 	class enumeration_request : public io_request {
 	public:
-		
+		using result_t = std::vector<shell::filesystem::placeholder_creation_info>;
+	private:
+		result_drain<result_t>& m_drain;
+	public:
+		enumeration_request(const std::filesystem::path& absolute_path, result_drain<result_t>& drain) : io_request(absolute_path), m_drain(drain) {}
+
+		result_drain<result_t>& get_drain() noexcept {
+			return this->m_drain;
+		}
 	};
 }
 

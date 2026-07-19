@@ -55,7 +55,7 @@ namespace linuxplorer::shell::filesystem {
 		[[deprecated("This constructor may reduce availability due to the strict requirement of the 1st argument.")]]
 		cloud_filter_placeholder(const cloud_provider_session& session, const std::filesystem::path& relative_path);
 		cloud_filter_placeholder(const cloud_filter_placeholder&) = delete;
-		cloud_filter_placeholder(cloud_filter_placeholder&& rhs);
+		cloud_filter_placeholder(cloud_filter_placeholder&& rhs) noexcept;
 
 		[[deprecated("This method may reduce availability due to the strict requirement of the 1st argument.")]]
 		static cloud_filter_placeholder create(const cloud_provider_session& session, const placeholder_creation_info& metadata);
@@ -106,7 +106,7 @@ namespace linuxplorer::shell::filesystem {
 		[[deprecated("This constructor may reduce availability due to the strict requirement of the 1st argument.")]]
 		file_placeholder(const cloud_provider_session& session, const std::filesystem::path& relative_path);
 		file_placeholder(const file_placeholder&) = delete;
-		file_placeholder(file_placeholder&& rhs);
+		file_placeholder(file_placeholder&& rhs) noexcept;
 		file_placeholder(cloud_filter_placeholder&& rhs);
 
 		virtual ~file_placeholder();
@@ -130,7 +130,7 @@ namespace linuxplorer::shell::filesystem {
 		[[deprecated("This constructor may reduce availability due to the strict requirement of the 1st argument.")]]
 		directory_placeholder(const cloud_provider_session& session, const std::filesystem::path& relative_path);
 		directory_placeholder(const directory_placeholder&) = delete;
-		directory_placeholder(directory_placeholder&& rhs);
+		directory_placeholder(directory_placeholder&& rhs) noexcept;
 		directory_placeholder(cloud_filter_placeholder&& rhs);
 
 		virtual ~directory_placeholder();

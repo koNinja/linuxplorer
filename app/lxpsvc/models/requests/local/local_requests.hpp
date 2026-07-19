@@ -3,6 +3,9 @@
 
 #include "../io_requests.hpp"
 
+#include <functional>
+#include <ranges>
+
 namespace linuxplorer::lxpsvc::models::requests::local {
 	class attribute_request : public io_request {
 	public:
@@ -55,6 +58,19 @@ namespace linuxplorer::lxpsvc::models::requests::local {
 	class hydration_triggering_request : public io_request {
 	public:
 		hydration_triggering_request(const std::filesystem::path& absolute_path) : io_request(absolute_path) {}
+	};
+
+	class directory_update_request : public io_request {
+	public:
+		using result_t = std::vector<shell::filesystem::placeholder_creation_info>;
+	private:
+		const result_t& m_placeholder_set;
+	public:
+		directory_update_request(const std::filesystem::path& absolute_path, const result_t& placeholder_set) : io_request(absolute_path), m_placeholder_set(placeholder_set) {}
+
+		const result_t& get_placeholder_set() const noexcept {
+			return this->m_placeholder_set;
+		}
 	};
 }
 

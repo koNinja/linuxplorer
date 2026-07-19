@@ -71,7 +71,9 @@ namespace linuxplorer::lxpsvc::models::operations {
 			requests::local::attribute_request,
 			requests::local::transform_request,
 			requests::local::dehydration_request,
-			requests::local::hydration_triggering_request
+			requests::local::hydration_triggering_request,
+			requests::remote::enumeration_request,
+			requests::local::directory_update_request
 		>;
 	private:
 		const identifier_type m_id;
@@ -145,8 +147,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 				}
 				else [[fallthrough]];
 			case requests::request_result::permanent_failure:
-				this->transition_on_permanent_failure();
-				this->m_result = operation_result::failed;
+				this->permanently_fail();
 				break;
 			case requests::request_result::cancelled:
 				this->transition_on_cancelled();
@@ -169,6 +170,11 @@ namespace linuxplorer::lxpsvc::models::operations {
 	protected:
 		const helpers::path_helper& get_path_helper() const noexcept {
 			return this->m_path_helper;
+		}
+
+		void permanently_fail() noexcept {
+			this->transition_on_permanent_failure();
+			this->m_result = operation_result::failed;
 		}
 
 		virtual void transition_on_success() noexcept = 0;
@@ -244,7 +250,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		DECLARE_STATE_TRAITS(hydration_operation, downloading);
 		DECLARE_STATE_TRAITS(population_operation, enumerating, cleaning_up, metadata_comitting);
 		DECLARE_STATE_TRAITS(attribute_operation, applying, committing);
-		DECLARE_STATE_TRAITS(directory_update_operation, enumerating, metadata_comitting, creating_new, cleaning_up, committing);
+		DECLARE_STATE_TRAITS(directory_update_operation, enumerating, entry_comitting, committing);
 	}
 
 	class creation_operation : public stateful_io_operation<internal::creation_operation_state_traits> {
@@ -414,7 +420,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 
 	class directory_update_operation : public stateful_io_operation<internal::directory_update_operation_state_traits> {
 	private:
-		requests::result_drain<std::vector<shell::filesystem::placeholder_creation_info>> m_enumerated_entries;
+		mutable std::unique_ptr<requests::result_drain<requests::remote::enumeration_request::result_t>> m_enumerated_entries;
 	protected:
 		virtual void transition_on_success() noexcept override;
 	public:

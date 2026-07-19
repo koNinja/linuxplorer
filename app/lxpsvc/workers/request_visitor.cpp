@@ -87,6 +87,15 @@ namespace linuxplorer::lxpsvc::workers {
 		return hr;
 	}
 
+	static std::wstring tolower_sys_localized(std::wstring_view str) {
+		std::wstring s(str);
+		std::locale loc("");
+		std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) {
+			return std::tolower(c, loc); }
+		);
+		return s;
+	};
+
 	operation_executor::request_visitor::request_visitor(
 		const ssh::sftp::sftp_session& sftp_session,
 		const shell::cloud_provider_session& cloud_provider_session,
@@ -389,15 +398,6 @@ namespace linuxplorer::lxpsvc::workers {
 			else return 1;
 		};
 
-		auto tolower_sys_localized = [](std::wstring_view str) {
-			std::wstring s(str);
-			std::locale loc("");
-			std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) { 
-				return std::tolower(c, loc); }
-			);
-			return s;
-		};
-
 		try {
 			std::unordered_set<std::filesystem::path> existent_files_in_server_lower;
 			auto frn = win32::get_frn(absolute_client_path);
@@ -450,7 +450,7 @@ namespace linuxplorer::lxpsvc::workers {
 
 					auto itr = std::find_if(info.begin(), info.end(), [&compare, &placeholder_name_lower](const shell::filesystem::placeholder_creation_info& info) {
 						return compare(info.get_relative_path().wstring(), placeholder_name_lower.wstring()) == 0;
-						});
+					});
 					if (itr != info.end()) {
 						LOG_WARNING(
 							this->m_logger,
@@ -465,12 +465,6 @@ namespace linuxplorer::lxpsvc::workers {
 					continue;
 				}
 				existent_files_in_server_lower.emplace(placeholder_name_lower);
-
-				if (::PathFileExistsW(absolute_placeholder_path.c_str())) {
-					this->m_population_cache.push_existent_file_metadata(frn, std::move(metadata));
-					skipped++;
-					continue;
-				}
 				
 				if (contains_invalid_ntfs_character(placeholder_name.wstring())) {
 					LOG_INFO(this->m_logger, "Skip '{}' because its name contains invalid characters in NTFS.", placeholder_name);
@@ -481,10 +475,9 @@ namespace linuxplorer::lxpsvc::workers {
 				info.push_back(std::move(metadata));
 			}
 
-			LOG_INFO(this->m_logger, "{} placeholders will be created, and {} will be skipped.", std::min<std::size_t>(info.size() - skipped, 0), skipped);
+			LOG_INFO(this->m_logger, "{} placeholders will be created, and {} will be skipped.", info.size(), skipped);
 
 			request.set_value(std::move(info));
-			this->m_population_cache.set_existent_file_set(frn, std::move(existent_files_in_server_lower));
 
 			return models::requests::request_result::success;
 		}
@@ -653,5 +646,207 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 
 		return models::requests::request_result::success;
+	}
+
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::enumeration_request& request, std::stop_token token) {
+		try {
+			std::vector<shell::filesystem::placeholder_creation_info> info;
+
+			auto compare = [](std::wstring_view l, std::wstring_view r) -> int {
+				if (l.length() == r.length()) return util::charset::case_insensitive_char_traits<wchar_t>::compare(l.data(), r.data(), std::min(l.length(), r.length()));
+				else return 1;
+				};
+
+			std::unordered_set<std::filesystem::path> existent_files_in_server_lower;
+
+			for (const auto& entity : ssh::sftp::filesystem::directory_iterator(this->m_sftp_session, request.get_absolute_path())) {
+				if (token.stop_requested()) {
+					LOG_INFO(this->m_logger, "The cancellation for this placeholder enumeration has been accepted.");
+					return models::requests::request_result::cancelled;
+				}
+
+				auto absolute_placeholder_path = this->m_path_helper.to_win_style(helpers::style_conversion_class::absolute_format, entity.path());
+				auto placeholder_name = absolute_placeholder_path.filename();
+
+				shell::filesystem::file_times file_times;
+				file_times.set_last_write_time(entity.last_write_time());
+				file_times.set_last_access_time(entity.last_access_time());
+
+				std::uint32_t file_attributes;
+				switch (entity.status().type()) {
+				case std::filesystem::file_type::directory:
+					file_attributes = FILE_ATTRIBUTE_DIRECTORY;
+					break;
+				case std::filesystem::file_type::regular:
+					file_attributes = FILE_ATTRIBUTE_NORMAL;
+					break;
+				default:
+					LOG_INFO(this->m_logger, "Skip '{}' due to not supported file type.", placeholder_name);
+					continue;
+				}
+
+				shell::filesystem::placeholder_creation_info metadata(
+					placeholder_name,
+					entity.file_size(),
+					file_attributes,
+					file_times
+				);
+
+				std::filesystem::path placeholder_name_lower = tolower_sys_localized(placeholder_name.wstring());
+				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
+					LOG_WARNING(
+						this->m_logger,
+						"Skip '{}' because there are files that are considered to have the same name in Windows.",
+						placeholder_name
+					);
+
+					auto itr = std::find_if(info.begin(), info.end(), [&compare, &placeholder_name_lower](const shell::filesystem::placeholder_creation_info& info) {
+						return compare(info.get_relative_path().wstring(), placeholder_name_lower.wstring()) == 0;
+						});
+					if (itr != info.end()) {
+						LOG_WARNING(
+							this->m_logger,
+							"Cancel update of '{}' because there are files that are considered to have the same name in Windows",
+							itr->get_relative_path()
+						);
+
+						info.erase(itr);
+					}
+
+					continue;
+				}
+				existent_files_in_server_lower.emplace(placeholder_name_lower);
+
+				if (contains_invalid_ntfs_character(placeholder_name.wstring())) {
+					LOG_INFO(this->m_logger, "Skip '{}' because its name contains invalid characters in NTFS.", placeholder_name);
+					continue;
+				}
+
+				info.push_back(std::move(metadata));
+			}
+
+			LOG_INFO(this->m_logger, "Retrieved {} files from the server", info.size());
+
+			request.get_drain().set_value(std::move(info));
+
+			return models::requests::request_result::success;
+		}
+		catch (const ssh::ssh_libssh2_exception& e) {
+			LOG_ERROR(
+				this->m_logger,
+				"Failed to enumerate directory entities in '{}'.",
+				request.get_absolute_path()
+			);
+			return models::requests::request_result::transient_failure;
+		}
+	}
+
+	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::directory_update_request& request, std::stop_token token) {
+		try {
+			auto local_placeholder_names_lower = std::filesystem::directory_iterator(request.get_absolute_path()) |
+				std::ranges::views::transform([](const std::filesystem::directory_entry& entry) {
+					return std::filesystem::path(tolower_sys_localized(entry.path().wstring())).filename();
+				}) | std::ranges::to<std::unordered_set>();
+				
+			for (const auto& enumerated_entry : request.get_placeholder_set()) {
+				if (token.stop_requested()) {
+					LOG_INFO(this->m_logger, "The cancellation for this placeholder enumeration has been accepted.");
+					return models::requests::request_result::cancelled;
+				}
+
+				auto enumerated_entry_path = request.get_absolute_path() / enumerated_entry.get_relative_path();
+				auto enumerated_entry_name_lower = std::filesystem::path(tolower_sys_localized(enumerated_entry.get_relative_path().wstring()));
+
+				if (local_placeholder_names_lower.contains(enumerated_entry_name_lower)) {
+					// update metadata
+					shell::filesystem::cloud_filter_placeholder placeholder(enumerated_entry_path);
+					placeholder.set_file_times(enumerated_entry.get_file_times());
+					auto identity_bytes_span = placeholder.get_identity();
+					placeholder.set_identity(std::vector<std::byte>(identity_bytes_span.begin(), identity_bytes_span.end()));
+					placeholder.set_marked_in_sync(true);
+
+					if (::GetFileAttributesW(enumerated_entry_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) {
+						placeholder.flush();
+					}
+					else {
+						shell::filesystem::file_placeholder file_placeholder(std::move(placeholder));
+						file_placeholder.set_file_size(enumerated_entry.get_file_size());
+						file_placeholder.flush();
+					}
+
+					bool succeeded = ::SetFileAttributesW(enumerated_entry_path.c_str(), enumerated_entry.get_file_attributes());
+					if (!succeeded) {
+						std::error_code ec(::GetLastError(), std::system_category());
+						LOG_WARNING(
+							this->m_logger,
+							"Failed to update the attributes of '{}' (Win32: {}({}))",
+							enumerated_entry_path,
+							ec.message(),
+							ec.value()
+						);
+						continue;
+					}
+
+					local_placeholder_names_lower.erase(enumerated_entry_name_lower);
+				}
+				else {
+					// create a new placeholder corresponding to the enumerated file from the server
+					shell::filesystem::placeholder_creation_info info(
+						this->m_path_helper.to_relative_from_syncroot(enumerated_entry_path),
+						enumerated_entry.get_file_size(),
+						enumerated_entry.get_file_attributes(),
+						enumerated_entry.get_file_times()
+					);
+					info.set_identity({ std::byte(0) });
+
+					shell::filesystem::cloud_filter_placeholder::create(this->m_path_helper.get_syncroot(), info);
+				}
+			}
+
+			for (const auto& local_entry_name_lower : local_placeholder_names_lower) {
+				if (token.stop_requested()) {
+					LOG_INFO(this->m_logger, "The cancellation for this placeholder enumeration has been accepted.");
+					return models::requests::request_result::cancelled;
+				}
+
+				auto local_placeholder_path = request.get_absolute_path() / local_entry_name_lower;
+
+				// remove orphaned placeholders
+				if (shell::filesystem::cloud_filter_placeholder(local_placeholder_path).is_marked_in_sync()) {
+					std::filesystem::remove_all(local_placeholder_path);
+					LOG_INFO(this->m_logger, "The file or directory '{}' is deemed as orphaned and has been successfully removed.", local_placeholder_path);
+				}
+				else {
+					raise_warning_state(local_placeholder_path, true);
+					LOG_INFO(this->m_logger, "The file or directory '{}' is deemed as orphaned, but its data have not been synchronized.", local_placeholder_path);
+				}
+			}
+
+			return models::requests::request_result::success;
+		}
+		catch (const shell::cloud_provider_system_error& e) {
+			LOG_ERROR(
+				this->m_logger,
+				"Failed a placeholder operation for '{}\\*': {} (Win32: {}({}))",
+				request.get_absolute_path(),
+				e.what(),
+				e.code().message(),
+				e.code().value()
+			);
+
+			return models::requests::request_result::transient_failure;
+		}
+		catch (const std::filesystem::filesystem_error& e) {
+			LOG_ERROR(
+				this->m_logger,
+				"Failed to enumerate existing placeholders in the directory '{}': {} (Win32: {}({}))",
+				request.get_absolute_path(),
+				e.what(),
+				e.code().message(),
+				e.code().value()
+			);
+
+			return models::requests::request_result::transient_failure;
+		}
 	}
 }
