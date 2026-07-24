@@ -1,10 +1,11 @@
 #include "io_operations.hpp"
 
 #include <shell/filesystem/cloud_filter_placeholder.hpp>
+#include <ranges>
 
 namespace linuxplorer::lxpsvc::models::operations {
-	creation_operation::creation_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path)
-		: stateful_io_operation<internal::creation_operation_state_traits>(operation_priority::lower, syncroot, relative_path), m_identity(1)
+	creation_operation::creation_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context)
+		: stateful_io_operation<internal::creation_operation_state_traits>(operation_priority::lower, syncroot, relative_path, cancellation_context), m_identity(1)
 	{
 		this->set_state(state_type::creating);
 		this->m_identity[0] = std::byte{0};
@@ -16,16 +17,14 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::creating:
 			return requests::remote::creation_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				this->m_type,
-				this->get_stop_token()
+				this->m_type
 			);
 		case state_type::transforming:
-			return requests::local::transform_request(this->get_absolute_path(), this->m_identity, this->get_stop_token());
+			return requests::local::transform_request(this->get_absolute_path(), this->m_identity);
 		case state_type::committing:
 			return requests::local::attribute_request(
 				this->get_absolute_path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
@@ -41,7 +40,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			this->set_state(this->m_type == std::filesystem::file_type::directory ? creation_operation::state_type::committing : creation_operation::state_type::done);
 			break;
 		case state_type::committing:
-			this->set_state(state_type::done);
+			this->finalize();
 			break;
 		default:
 			break;
@@ -56,8 +55,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return true;
 	}
 
-	modification_operation::modification_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, models::requests::remote::modification_type type) :
-		stateful_io_operation<internal::modification_operation_state_traits>(operation_priority::lower, syncroot, relative_path),
+	modification_operation::modification_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, models::requests::remote::modification_type type, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::modification_operation_state_traits>(operation_priority::lower, syncroot, relative_path, cancellation_context),
 		m_current_range_index(0), m_type(type)
 	{
 		if (std::filesystem::is_directory(this->get_absolute_path())) {
@@ -142,11 +141,10 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::modification_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				this->m_ranges->at(this->m_current_range_index),
-				this->m_type,
-				this->get_stop_token()
+				this->m_type
 			);
 		case state_type::committing:
-			return requests::local::attribute_request(this->get_absolute_path(), requests::local::attribute_request::change_domain::mark_in_sync, this->get_stop_token());
+			return requests::local::attribute_request(this->get_absolute_path(), requests::local::attribute_request::change_domain::mark_in_sync);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
 		}
@@ -166,7 +164,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			break;
 		}
 		case state_type::committing:
-			this->set_state(state_type::done);
+			this->finalize();
 			break;
 		default:
 			break;
@@ -193,8 +191,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return true;
 	}
 
-	deletion_operation::deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) : 
-		stateful_io_operation<internal::deletion_operation_state_traits>(operation_priority::higher, syncroot, relative_path)
+	deletion_operation::deletion_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::deletion_operation_state_traits>(operation_priority::higher, syncroot, relative_path, cancellation_context)
 	{
 		this->set_state(state_type::deleting);
 		this->m_adapter = std::make_shared<requests::result_adapter<void>>();
@@ -206,8 +204,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		{
 			return requests::remote::deletion_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		default:
@@ -218,7 +215,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 	void deletion_operation::transition_on_success() noexcept {
 		switch (this->get_state()) {
 		case state_type::deleting:
-			this->set_state(state_type::done);
+			this->finalize();
 			this->m_adapter->finalize();
 			break;
 		default:
@@ -240,8 +237,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	renaming_operation::renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_old_path, const std::filesystem::path& absolute_new_path) : 
-		stateful_io_operation<internal::renaming_operation_state_traits>(operation_priority::higher, syncroot, relative_old_path), 
+	renaming_operation::renaming_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_old_path, const std::filesystem::path& absolute_new_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::renaming_operation_state_traits>(operation_priority::higher, syncroot, relative_old_path, cancellation_context), 
 		m_absolute_new_path(absolute_new_path)
 	{
 		this->m_adapter = std::make_shared<requests::result_adapter<void>>();
@@ -261,24 +258,21 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::renaming_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				this->get_path_helper().to_linux_style(this->m_absolute_new_path, helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		case state_type::deleting:
 		{
 			return requests::remote::deletion_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		case state_type::committing:
 		{
 			return requests::local::attribute_request(
 				this->get_absolute_path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		}
 		default:
@@ -294,7 +288,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			break;
 		case state_type::deleting: [[fallthrough]];
 		case state_type::committing:
-			this->set_state(state_type::done);
+			this->finalize();
 			this->m_adapter->finalize();
 			break;
 		default:
@@ -316,11 +310,11 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	import_operation::import_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
-		stateful_io_operation<internal::import_operation_state_traits>(operation_priority::lower, syncroot, relative_path)
+	import_operation::import_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::import_operation_state_traits>(operation_priority::lower, syncroot, relative_path, cancellation_context)
 	{
 		if (shell::filesystem::cloud_filter_placeholder::is_placeholder(this->get_absolute_path())) {
-			this->set_state(state_type::done);
+			this->finalize();
 			return;
 		}
 
@@ -340,14 +334,12 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::creating:
 			return requests::remote::creation_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				std::filesystem::status(this->get_absolute_path()).type(),
-				this->get_stop_token()
+				std::filesystem::status(this->get_absolute_path()).type()
 			);
 		case state_type::transforming:
 			return requests::local::transform_request(
 				this->get_absolute_path(),
-				{ std::byte{0} }, // dummy FileIdentity blob
-				this->get_stop_token()
+				{ std::byte{0} } // dummy FileIdentity blob
 			);
 		case state_type::uploading:
 		{
@@ -357,27 +349,23 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::modification_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				range(offset, length),
-				requests::remote::modification_type::appended,
-				this->get_stop_token()
+				requests::remote::modification_type::appended
 			);
 		}
 		case state_type::committing:
 			return requests::local::attribute_request(
 				this->get_absolute_path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		case state_type::creating_child:
 			return requests::remote::creation_request(
 				this->get_path_helper().to_linux_style(this->m_rditr->path(), helpers::style_conversion_class::absolute_format),
-				this->m_rditr->status().type(),
-				this->get_stop_token()
+				this->m_rditr->status().type()
 			);
 		case state_type::transforming_child:
 			return requests::local::transform_request(
 				this->m_rditr->path(),
-				{ std::byte{0} },
-				this->get_stop_token()
+				{ std::byte{0} }
 			);
 		case state_type::uploading_child:
 		{
@@ -387,15 +375,13 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::modification_request(
 				this->get_path_helper().to_linux_style(this->m_rditr->path(), helpers::style_conversion_class::absolute_format),
 				range(offset, length),
-				requests::remote::modification_type::appended,
-				this->get_stop_token()
+				requests::remote::modification_type::appended
 			);
 		}
 		case state_type::committing_child:
 			return requests::local::attribute_request(
 				this->m_rditr->path(),
-				requests::local::attribute_request::change_domain::mark_in_sync,
-				this->get_stop_token()
+				requests::local::attribute_request::change_domain::mark_in_sync
 			);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
@@ -416,7 +402,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			auto stat = std::filesystem::status(this->get_absolute_path(), ec);
 
 			if (ec || stat.type() != std::filesystem::file_type::regular) {
-				// unable to upload
+				// when unable to upload
 				this->set_state(state_type::committing);
 			}
 			else {
@@ -441,7 +427,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::committing:
 		{
 			if (this->m_rditr == this->m_rditr_end) {
-				this->set_state(state_type::done);
+				this->finalize();
 			}
 			else {
 				this->set_state(state_type::creating_child);
@@ -460,7 +446,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			auto stat = this->m_rditr->status(ec);
 
 			if (ec || stat.type() != std::filesystem::file_type::regular) {
-				// unable to upload
+				// when unable to upload
 				this->set_state(state_type::committing_child);
 			}
 			else {
@@ -485,7 +471,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::committing_child:
 		{
 			if (this->m_rditr == this->m_rditr_end || ++this->m_rditr == this->m_rditr_end) {
-				this->set_state(state_type::done);
+				this->finalize();
 			}
 			else {
 				this->set_state(state_type::creating_child);
@@ -507,8 +493,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return true;
 	}
 
-	hydration_operation::hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range) :
-		stateful_io_operation<internal::hydration_operation_state_traits>(operation_priority::normal, syncroot, relative_path),
+	hydration_operation::hydration_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, const range<std::size_t>& range, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::hydration_operation_state_traits>(operation_priority::normal, syncroot, relative_path, cancellation_context),
 		m_range(range), m_remaining_length(range.get_length())
 	{
 		this->set_state(state_type::downloading);
@@ -523,8 +509,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			return requests::remote::hydration_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
 				range,
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		}
 		default:
@@ -540,7 +525,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			this->m_remaining_length -= range.get_length();
 
 			if (this->m_remaining_length == 0) {
-				this->set_state(state_type::done);
+				this->finalize();
 				this->m_adapter->finalize();
 			}
 
@@ -565,8 +550,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	population_operation::population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
-		stateful_io_operation<internal::population_operation_state_traits>(operation_priority::higher, syncroot, relative_path)
+	population_operation::population_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::population_operation_state_traits>(operation_priority::higher, syncroot, relative_path, cancellation_context)
 	{
 		this->set_state(state_type::enumerating);
 		this->m_adapter = std::make_shared<requests::result_adapter<result_t>>();
@@ -577,8 +562,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		case state_type::enumerating:
 			return requests::remote::population_request(
 				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
-				*this->m_adapter,
-				this->get_stop_token()
+				*this->m_adapter
 			);
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
@@ -589,7 +573,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 		switch (this->get_state()) {
 		case state_type::enumerating:
 		{
-			this->set_state(state_type::done);
+			this->finalize();
 			this->m_adapter->finalize();
 			break;
 		}
@@ -612,17 +596,17 @@ namespace linuxplorer::lxpsvc::models::operations {
 		return this->m_adapter;
 	}
 
-	attribute_operation::attribute_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path) :
-		stateful_io_operation<internal::attribute_operation_state_traits>(operation_priority::immediate, syncroot, relative_path)
+	attribute_operation::attribute_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation<internal::attribute_operation_state_traits>(operation_priority::immediate, syncroot, relative_path, cancellation_context)
 	{
 		if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(this->get_absolute_path())) {
-			this->set_state(state_type::done);
+			this->finalize();
 			return;
 		}
 
 		shell::filesystem::cloud_filter_placeholder placeholder(this->get_absolute_path());
 		if (placeholder.get_type() != shell::filesystem::placeholder_type::file) {
-			this->set_state(state_type::done);
+			this->finalize();
 			return;
 		}
 
@@ -640,7 +624,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			break;
 		}
 		default:
-			this->set_state(state_type::done);
+			this->finalize();
 			return;
 		};
 	}
@@ -651,9 +635,9 @@ namespace linuxplorer::lxpsvc::models::operations {
 		{
 			switch (this->m_reason) {
 				case operation_reason::pinned:
-					return requests::local::hydration_triggering_request(this->get_absolute_path(), this->get_stop_token());
+					return requests::local::hydration_triggering_request(this->get_absolute_path());
 				case operation_reason::unpinned:
-					return requests::local::dehydration_request(this->get_absolute_path(), this->get_stop_token());
+					return requests::local::dehydration_request(this->get_absolute_path());
 				default:
 					throw not_implemented_exception("The reason for attribute change is not supported.");
 			}
@@ -663,8 +647,7 @@ namespace linuxplorer::lxpsvc::models::operations {
 			if (this->m_reason == operation_reason::unpinned) {
 				return requests::local::attribute_request(
 					this->get_absolute_path(),
-					requests::local::attribute_request::change_domain::mark_in_sync,
-					this->get_stop_token()
+					requests::local::attribute_request::change_domain::mark_in_sync
 				);
 			}
 			else [[fallthrough]];
@@ -682,12 +665,12 @@ namespace linuxplorer::lxpsvc::models::operations {
 				break;
 			case operation_reason::pinned: [[fallthrough]];
 			default:
-				this->set_state(state_type::done);
+				this->finalize();
 				break;
 			}
 			break;
 		case state_type::committing:
-			this->set_state(state_type::done);
+			this->finalize();
 			break;
 		case state_type::done:
 			break;
@@ -756,6 +739,56 @@ namespace linuxplorer::lxpsvc::models::operations {
 		}
 		default:
 			return false;
+		}
+	}
+
+	directory_update_operation::directory_update_operation(const std::filesystem::path& syncroot, const std::filesystem::path& relative_path, std::shared_ptr<cancellation_context> cancellation_context) :
+		stateful_io_operation(operation_priority::lower, syncroot, relative_path, cancellation_context)
+	{
+		this->set_state(state_type::enumerating);
+		this->m_enumerated_entries = std::make_unique<requests::result_drain<requests::remote::enumeration_request::result_t>>();
+	}
+
+	directory_update_operation::request_variant_t directory_update_operation::fetch() const {
+		switch (this->get_state()) {
+		case state_type::enumerating:
+			return requests::remote::enumeration_request(
+				this->get_path_helper().to_linux_style(this->get_absolute_path(), helpers::style_conversion_class::absolute_format),
+				*this->m_enumerated_entries
+			);
+		case state_type::entry_comitting:	
+			return requests::local::directory_update_request(
+				this->get_absolute_path(),
+				*this->m_enumerated_entries->try_get_value()
+			);
+		case state_type::committing:
+			return requests::local::attribute_request(
+				this->get_absolute_path(),
+				requests::local::attribute_request::change_domain::mark_in_sync
+			);
+		default:
+			throw invalid_state_exception("The state machine has already been completed.");
+		}
+	}
+
+	void directory_update_operation::transition_on_success() noexcept {
+		switch (this->get_state()) {
+		case state_type::enumerating:
+			if (this->m_enumerated_entries->try_get_value() == nullptr) {
+				this->permanently_fail();
+			}
+			else {
+				this->set_state(state_type::entry_comitting);
+			}
+			break;
+		case state_type::entry_comitting:
+			this->set_state(state_type::committing);
+			break;
+		case state_type::committing:
+			this->finalize();
+			break;
+		default:
+			break;
 		}
 	}
 }

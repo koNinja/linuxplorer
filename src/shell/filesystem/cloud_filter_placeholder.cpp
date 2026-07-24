@@ -15,7 +15,7 @@ namespace linuxplorer::shell::filesystem {
 		this->fetch();
 	}
 
-	cloud_filter_placeholder::cloud_filter_placeholder(cloud_filter_placeholder&& rhs) : 
+	cloud_filter_placeholder::cloud_filter_placeholder(cloud_filter_placeholder&& rhs) noexcept : 
 		m_id(rhs.m_id),
 		m_absolute_path(std::move(rhs.m_absolute_path)),
 		m_handle(rhs.m_handle),
@@ -36,7 +36,7 @@ namespace linuxplorer::shell::filesystem {
 		::CF_FS_METADATA nt_metadata;
 		nt_metadata.FileSize.QuadPart = metadata.get_file_size();
 		nt_metadata.BasicInfo.FileAttributes = metadata.get_file_attributes();
-		auto file_times = metadata.get_file_times();
+		const auto& file_times = metadata.get_file_times();
 		nt_metadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
 		nt_metadata.BasicInfo.CreationTime.QuadPart = file_times.get_creation_time().time_since_epoch().count();
 		nt_metadata.BasicInfo.LastAccessTime.QuadPart = file_times.get_last_access_time().time_since_epoch().count();
@@ -75,7 +75,7 @@ namespace linuxplorer::shell::filesystem {
 		::CF_FS_METADATA nt_metadata;
 		nt_metadata.FileSize.QuadPart = metadata.get_file_size();
 		nt_metadata.BasicInfo.FileAttributes = metadata.get_file_attributes();
-		auto file_times = metadata.get_file_times();
+		const auto& file_times = metadata.get_file_times();
 		nt_metadata.BasicInfo.ChangeTime.QuadPart = file_times.get_change_time().time_since_epoch().count();
 		nt_metadata.BasicInfo.CreationTime.QuadPart = file_times.get_creation_time().time_since_epoch().count();
 		nt_metadata.BasicInfo.LastAccessTime.QuadPart = file_times.get_last_access_time().time_since_epoch().count();
@@ -461,7 +461,7 @@ namespace linuxplorer::shell::filesystem {
 		this->internal_secondary_fetch();
 	}
 
-	file_placeholder::file_placeholder(file_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)), m_file_size(rhs.m_file_size) {}
+	file_placeholder::file_placeholder(file_placeholder&& rhs) noexcept : cloud_filter_placeholder(std::move(rhs)), m_file_size(rhs.m_file_size) {}
 
 	file_placeholder::file_placeholder(cloud_filter_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {
 		if (this->get_type() != placeholder_type::file) {
@@ -563,7 +563,7 @@ namespace linuxplorer::shell::filesystem {
 		this->internal_secondary_fetch();
 	}
 
-	directory_placeholder::directory_placeholder(directory_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)), m_enumeration_enabled(rhs.m_enumeration_enabled) {}
+	directory_placeholder::directory_placeholder(directory_placeholder&& rhs) noexcept : cloud_filter_placeholder(std::move(rhs)), m_enumeration_enabled(rhs.m_enumeration_enabled) {}
 
 	directory_placeholder::directory_placeholder(cloud_filter_placeholder&& rhs) : cloud_filter_placeholder(std::move(rhs)) {
 		if (this->get_type() != placeholder_type::directory) {

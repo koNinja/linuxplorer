@@ -11,13 +11,15 @@ namespace linuxplorer::lxpsvc::resilience {
 		std::mutex& session_mutex
 	) : m_duration(duration), m_ssh_session(ssh_session), m_sftp_session(sftp_session), m_termination_requested(false),
 		m_execution_context(execution_context), m_session_mutex(session_mutex), m_state(session_keeper_state::pending)
-	{
-		this->m_keeper_thread = std::thread(&session_keeper::keep_alive, this);
-	}
+	{}
 
 	session_keeper::~session_keeper() {
 		this->request_stop();
 		this->wait();
+	}
+
+	void session_keeper::start() {
+		this->m_keeper_thread = std::thread(&session_keeper::keep_alive, this);
 	}
 
 	void session_keeper::keep_alive() {

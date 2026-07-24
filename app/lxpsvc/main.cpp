@@ -2,6 +2,8 @@
 #include <vector>
 #include <memory>
 
+#include <objbase.h>
+
 #include <quill/Backend.h>
 
 #define TO_WSTRING(x)	L#x
@@ -16,6 +18,13 @@ int APIENTRY wWinMain(::HINSTANCE hInstance, ::HINSTANCE, ::LPWSTR lpCmdLine, in
 
 	try {
 		quill::Backend::start();
+		::HRESULT hr = ::CoInitializeEx(nullptr, ::COINIT::COINIT_MULTITHREADED);
+		if (FAILED(hr)) {
+			std::error_code ec(hr, std::system_category());
+			std::string message = std::format("Failed to initialize the COM library. (HRESULT: {}({}))", ec.message(), ec.value());
+			::MessageBoxA(nullptr, message.c_str(), "Initialization error", MB_ICONERROR | MB_OK);
+			return 1;
+		}
 
 		linuxplorer::lxpsvc::win32::unique_event_handle termination_event = ::CreateEventW(nullptr, true, false, WSTRINGIFY(LINUXPLORER_APP_SERVICE_TERMINATE_EVENT_NAME));
 		if (!termination_event) {
@@ -32,6 +41,7 @@ int APIENTRY wWinMain(::HINSTANCE hInstance, ::HINSTANCE, ::LPWSTR lpCmdLine, in
 
 		for (const auto& profile : profiles) {
 			auto runtime = std::make_unique<linuxplorer::lxpsvc::services::profile_runtime>(profile);
+			runtime->start();
 			events.push_back(runtime->get_death_event().get());
 			runtimes.push_back(std::move(runtime));
 		}
@@ -81,6 +91,7 @@ int APIENTRY wWinMain(::HINSTANCE hInstance, ::HINSTANCE, ::LPWSTR lpCmdLine, in
 	}
 
 	quill::Backend::stop();
+	::CoUninitialize();
 
 	return 0;
 }

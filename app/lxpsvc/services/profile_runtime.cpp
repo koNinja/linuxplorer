@@ -52,8 +52,6 @@ namespace linuxplorer::lxpsvc::services {
 				);
 				return;
 			}
-
-			this->m_runtime_thread = std::thread(&profile_runtime::thread_main, this);
 		}
 		catch (...) {
 			::MessageBoxW(nullptr, L"An unexpected error has occurred in the runtime.", L"Runtime Error", MB_ICONERROR | MB_OK);
@@ -83,6 +81,10 @@ namespace linuxplorer::lxpsvc::services {
 			util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(logger_name),
 			std::move(sink)
 		);
+	}
+
+	void profile_runtime::start() {
+		this->m_runtime_thread = std::thread(&profile_runtime::thread_main, this);
 	}
 
 	void profile_runtime::request_stop() noexcept {
@@ -211,12 +213,15 @@ namespace linuxplorer::lxpsvc::services {
 			this->m_ssh_mutex,
 			this->m_executor_logger
 		);
+		this->m_executor->start();
 		LOG_INFO(this->m_logger, "The operation executor started.");
 
 		this->m_watcher.emplace(this->m_profile.get_syncroot(), this->m_execution_context, this->m_watcher_logger);
+		this->m_watcher->start();
 		LOG_INFO(this->m_logger, "The filesystem watcher started.");
 
 		this->m_keeper.emplace(s_keepalive_duration, *this->m_ssh_session, *this->m_sftp_session, this->m_execution_context, this->m_ssh_mutex);
+		this->m_keeper->start();
 		LOG_INFO(this->m_logger, "The session keeper started.");
 	}
 

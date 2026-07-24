@@ -1,5 +1,4 @@
 add_executable(${LINUXPLORER_APP_SERVICE_NAME} WIN32)
-# add_library(${LINUXPLORER_APP_SERVICE_NAME} STATIC)
 set(LINUXPLORER_APP_SERVICE_DIR ${LINUXPLORER_APP_SERVICE_NAME})
 target_compile_definitions(${LINUXPLORER_APP_SERVICE_NAME} 
 	PRIVATE 
@@ -17,10 +16,14 @@ target_sources(${LINUXPLORER_APP_SERVICE_NAME}
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/exceptions/abnormal_systems.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/helpers/path_helper.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/data_range.hpp
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/lru_cache.hpp
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/cancellation_context.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/operations/io_operations.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/requests/io_requests.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/requests/local/local_requests.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/requests/remote/remote_requests.hpp
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/requests/result_adapter.hpp
+	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/models/requests/result_drain.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/services/profile_runtime.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/win32/handle.hpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_SERVICE_DIR}/win32/ntfs.hpp
@@ -49,6 +52,7 @@ target_link_libraries(${LINUXPLORER_APP_SERVICE_NAME}
 	linuxplorer::shell
 	linuxplorer::util::charset
 	linuxplorer::util::config
+	libssh2::libssh2
 	quill::quill
 	cldapi
 	propsys

@@ -12,9 +12,9 @@ namespace linuxplorer::lxpsvc::workers {
 		std::mutex& sftp_mutex,
 		quill::Logger* logger
 	) : 
-		m_visitor(sftp_session, cloud_provider_session, this->m_pending_hydrations, logger), m_logger(logger),
-		m_execution_context(execution_context), m_executor_state(operation_executor_state::pending),
-		m_sftp_mutex(sftp_mutex)
+		m_logger(logger), m_execution_context(execution_context), 
+		m_executor_state(operation_executor_state::pending), m_sftp_mutex(sftp_mutex),
+		m_visitor(sftp_session, cloud_provider_session, this->m_pending_hydrations, logger)
 	{
 		this->m_termination_event = ::CreateEventW(nullptr, true, false, nullptr);
 		if (!this->m_termination_event) {
@@ -26,7 +26,9 @@ namespace linuxplorer::lxpsvc::workers {
 				ec.value()
 			);
 		}
+	}
 
+	void operation_executor::start() {
 		this->m_executor_thread = std::thread(&operation_executor::execute_operations, this);
 	}
 
@@ -152,13 +154,18 @@ namespace linuxplorer::lxpsvc::workers {
 
 			while (!nullable_task->done()) {
 				try {
-					if (nullable_task->has_cancel_requested()) {
+					if (nullable_task->get_stop_token().stop_requested()) {
 						nullable_task->transition(models::requests::request_result::cancelled);
 						break;
 					}
-
+					
 					auto any_request = nullable_task->fetch();
-					models::requests::request_result result = std::visit(this->m_visitor, any_request);
+					models::requests::request_result result = std::visit(
+						[this, &nullable_task](auto&& request) {
+							return this->m_visitor(request, nullable_task->get_stop_token());
+						},
+						any_request
+					);
 					nullable_task->transition(result);
 
 					bool need_to_exit_loop = false;

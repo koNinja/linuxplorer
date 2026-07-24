@@ -19,6 +19,8 @@
 #include <atomic>
 #include <list>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <quill/Logger.h>
 
@@ -33,6 +35,12 @@ namespace linuxplorer::lxpsvc::workers {
 	private:
 		class request_visitor {
 		private:
+			const ssh::sftp::sftp_session& m_sftp_session;
+			const shell::cloud_provider_session& m_cloud_provider_session;
+			quill::Logger* m_logger;
+			helpers::path_helper m_path_helper;
+			std::list<win32::overlapped>& m_pending_hydrations;
+
 			struct stream_cache_wrapper {
 			public:
 				inline static constexpr std::size_t s_cache_capacity = 10;
@@ -50,12 +58,6 @@ namespace linuxplorer::lxpsvc::workers {
 					return this->m_remote_ostream;
 				}
 			} m_stream_cache;
-
-			const ssh::sftp::sftp_session& m_sftp_session;
-			const shell::cloud_provider_session& m_cloud_provider_session;
-			quill::Logger* m_logger;
-			helpers::path_helper m_path_helper;
-			std::list<win32::overlapped>& m_pending_hydrations;
 		public:
 			request_visitor(
 				const ssh::sftp::sftp_session& sftp_session,
@@ -64,16 +66,18 @@ namespace linuxplorer::lxpsvc::workers {
 				quill::Logger* logger
 			);
 
-			models::requests::request_result operator()(models::requests::remote::creation_request& request);
-			models::requests::request_result operator()(models::requests::remote::modification_request& request);
-			models::requests::request_result operator()(models::requests::remote::deletion_request& request);
-			models::requests::request_result operator()(models::requests::remote::renaming_request& request);
-			models::requests::request_result operator()(models::requests::remote::hydration_request& request);
-			models::requests::request_result operator()(models::requests::remote::population_request& request);
-			models::requests::request_result operator()(models::requests::local::attribute_request& request);
-			models::requests::request_result operator()(models::requests::local::transform_request& request);
-			models::requests::request_result operator()(models::requests::local::dehydration_request& request);
-			models::requests::request_result operator()(models::requests::local::hydration_triggering_request& request);
+			models::requests::request_result operator()(models::requests::remote::creation_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::modification_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::deletion_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::renaming_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::hydration_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::population_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::attribute_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::transform_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::dehydration_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::hydration_triggering_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::remote::enumeration_request& request, std::stop_token token);
+			models::requests::request_result operator()(models::requests::local::directory_update_request& request, std::stop_token token);
 		};
 	private:
 		std::atomic<operation_executor_state> m_executor_state;
@@ -88,9 +92,9 @@ namespace linuxplorer::lxpsvc::workers {
 		std::mutex& m_sftp_mutex;
 		quill::Logger* m_logger;
 
-		request_visitor m_visitor;
-
 		std::list<win32::overlapped> m_pending_hydrations;
+
+		request_visitor m_visitor;
 	public:
 		operation_executor(
 			const ssh::sftp::sftp_session& sftp_session,
@@ -100,6 +104,8 @@ namespace linuxplorer::lxpsvc::workers {
 			quill::Logger* logger
 		);
 		virtual ~operation_executor();
+
+		void start();
 
 		void request_stop() noexcept;
 		void wait() noexcept;

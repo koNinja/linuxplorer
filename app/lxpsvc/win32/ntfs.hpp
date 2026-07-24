@@ -14,7 +14,7 @@ namespace linuxplorer::lxpsvc::win32 {
 		file_reference_number(const ::FILE_ID_128& frn) : m_frn(frn) {}
 		file_reference_number(::FILE_ID_128&& frn) : m_frn(frn) {}
 		file_reference_number(const file_reference_number& lhs) : m_frn(lhs.m_frn) {}
-		file_reference_number(file_reference_number&& rhs) : m_frn(rhs.m_frn) {}
+		file_reference_number(file_reference_number&& rhs) noexcept : m_frn(rhs.m_frn) {}
 		file_reference_number& operator=(const file_reference_number& lhs) {
 			if (this != &lhs) {
 				std::copy(lhs.m_frn.Identifier, lhs.m_frn.Identifier + 16, this->m_frn.Identifier);
@@ -22,7 +22,7 @@ namespace linuxplorer::lxpsvc::win32 {
 			return *this;
 		}
 
-		file_reference_number& operator=(file_reference_number&& rhs) {
+		file_reference_number& operator=(file_reference_number&& rhs) noexcept {
 			if (this != &rhs) {
 				std::copy(rhs.m_frn.Identifier, rhs.m_frn.Identifier + 16, this->m_frn.Identifier);
 			}

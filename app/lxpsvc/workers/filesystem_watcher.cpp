@@ -116,7 +116,9 @@ namespace linuxplorer::lxpsvc::workers {
 		}
 
 		this->m_surveillance_overlapped.emplace(std::move(directory_handle));
+	}
 
+	void filesystem_watcher::start() {
 		this->m_watcher_thread = std::thread(&filesystem_watcher::watch_actions, this);
 	}
 
@@ -515,6 +517,7 @@ namespace linuxplorer::lxpsvc::workers {
 				}
 
 				this->raise_io_operations(relative_path, journal->Usn, journal->Reason);
+				this->try_raise_parent_directory_update_if(relative_path, journal->ParentFileReferenceNumber);
 			}
 
 			read_data.StartUsn = next_read_start_at = *reinterpret_cast<::USN*>(bytes_journal.get());
@@ -618,5 +621,25 @@ namespace linuxplorer::lxpsvc::workers {
 		catch (...) {
 			return true;
 		}
+	}
+
+	bool filesystem_watcher::try_raise_parent_directory_update_if(const std::filesystem::path& relative_path, const win32::file_reference_number& parent_frn) {
+		auto absolute_path = this->m_absolute_watching_path / relative_path;
+
+		if (::GetFileAttributesW(absolute_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) return false;
+
+		static std::unordered_map<win32::file_reference_number, std::chrono::system_clock::time_point> last_updated_times;
+
+		if (last_updated_times.contains(parent_frn)) {
+			auto duration_since_last_updated = std::chrono::system_clock::now() - last_updated_times[parent_frn];
+			if (duration_since_last_updated <= s_directory_update_duration) return false;
+		}
+
+		auto task = std::make_unique<models::operations::directory_update_operation>(this->m_absolute_watching_path, relative_path.parent_path());
+		LOG_INFO(this->m_logger, "Request a directory update for '{}'. (Operation #{})", absolute_path.parent_path(), task->get_id());
+		this->m_execution_context.enqueue_task(std::move(task));
+
+		last_updated_times[parent_frn] = std::chrono::system_clock::now();
+		return true;
 	}
 }

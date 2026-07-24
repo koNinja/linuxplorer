@@ -32,6 +32,7 @@ namespace linuxplorer::lxpsvc::workers {
 		inline static constexpr std::uint32_t s_supported_file_changes_at_once = 500;
 		inline static constexpr std::uint32_t s_notify_filter = FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME;
 		inline static constexpr std::uint32_t s_usn_reason_mask = USN_REASON_BASIC_INFO_CHANGE | USN_REASON_DATA_OVERWRITE | USN_REASON_DATA_EXTEND | USN_REASON_FILE_CREATE | USN_REASON_DATA_TRUNCATION | USN_REASON_RENAME_NEW_NAME;
+		inline static constexpr std::chrono::seconds s_directory_update_duration = std::chrono::seconds(60);
 	private:
 		std::atomic<filesystem_watcher_state> m_watcher_state;
 		std::thread m_watcher_thread;
@@ -55,6 +56,7 @@ namespace linuxplorer::lxpsvc::workers {
 		);
 
 		void raise_io_operations(const std::filesystem::path& relative_path, ::USN usn, std::uint32_t why);
+		bool try_raise_parent_directory_update_if(const std::filesystem::path& relative_path, const win32::file_reference_number& parent_frn);
 
 		bool auxiliarily_verify_execution_necessity_for_attribute(const std::filesystem::path& absolute_path) const noexcept;
 
@@ -64,6 +66,7 @@ namespace linuxplorer::lxpsvc::workers {
 		filesystem_watcher(const std::filesystem::path& absolute_path_to_watch, contexts::execution_context& execution_context, quill::Logger* logger);
 		virtual ~filesystem_watcher();
 
+		void start();
 		void request_stop() noexcept;
 		void wait() noexcept;
 		

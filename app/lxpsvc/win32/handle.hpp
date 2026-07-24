@@ -100,7 +100,7 @@ namespace linuxplorer::lxpsvc::win32 {
 
 		std::shared_ptr<internal::handle_sharing_context<traits_type>> m_context;
 	public:
-		basic_shared_handle() noexcept : m_context(traits_type::invalid()) {}
+		basic_shared_handle() noexcept : m_context(nullptr) {}
 		basic_shared_handle(handle_type handle) : m_context(std::make_shared<internal::handle_sharing_context<traits_type>>(handle)) {}
 		basic_shared_handle(const basic_shared_handle<handle_traits>& lhs) noexcept : m_context(lhs.m_context) {}
 		basic_shared_handle(basic_shared_handle<handle_traits>&& rhs) noexcept : m_context(std::move(rhs.m_context)) {}
