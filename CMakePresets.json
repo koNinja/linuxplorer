@@ -10,9 +10,8 @@
 			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"VCPKG_APPLOCAL_DEPS": "ON",
 				"VCPKG_MANIFEST_MODE": "ON",
-				"VCPKG_TARGET_TRIPLET": "x64-windows"
+				"VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
 			},
 			"vendor": {
 				"microsoft.com/VisualStudioSettings/CMake/1.0": {
@@ -29,9 +28,8 @@
 			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release",
-				"VCPKG_APPLOCAL_DEPS": "ON",
 				"VCPKG_MANIFEST_MODE": "ON",
-				"VCPKG_TARGET_TRIPLET": "x64-windows"
+				"VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
 			},
 			"vendor": {
 				"microsoft.com/VisualStudioSettings/CMake/1.0": {

@@ -32,6 +32,6 @@ target_sources(linuxplorer.util.config
 	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_UTIL_CONFIG_DIR}/profiles.hpp
 )
 target_link_libraries(linuxplorer.util.config 
-	PUBLIC OpenSSL::Crypto OpenSSL::SSL linuxplorer::util::charset crypt32 nlohmann_json::nlohmann_json
+	PRIVATE OpenSSL::Crypto OpenSSL::SSL linuxplorer::util::charset crypt32 nlohmann_json::nlohmann_json
 )
 install(TARGETS linuxplorer.util.config RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

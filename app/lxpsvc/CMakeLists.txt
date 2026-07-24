@@ -1,5 +1,4 @@
 add_executable(${LINUXPLORER_APP_SERVICE_NAME} WIN32)
-# add_library(${LINUXPLORER_APP_SERVICE_NAME} STATIC)
 set(LINUXPLORER_APP_SERVICE_DIR ${LINUXPLORER_APP_SERVICE_NAME})
 target_compile_definitions(${LINUXPLORER_APP_SERVICE_NAME} 
 	PRIVATE 
@@ -53,6 +52,7 @@ target_link_libraries(${LINUXPLORER_APP_SERVICE_NAME}
 	linuxplorer::shell
 	linuxplorer::util::charset
 	linuxplorer::util::config
+	libssh2::libssh2
 	quill::quill
 	cldapi
 	propsys
