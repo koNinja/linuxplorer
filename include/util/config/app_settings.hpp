@@ -51,11 +51,15 @@ namespace linuxplorer::util::config {
 			try {
 				std::unique_lock lock(s_mutex);
 				if (!s_config_json) {
-					std::unique_lock ulock(s_mutex);
-					std::ifstream ifs;
-					ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-					ifs.open(get_config_path());
-					s_config_json = nlohmann::json::parse(ifs);
+					lock.unlock();
+					{
+						std::unique_lock ulock(s_mutex);
+						std::ifstream ifs;
+						ifs.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+						ifs.open(get_config_path());
+						s_config_json = nlohmann::json::parse(ifs);
+					}
+					lock.lock();
 				}
 
 				(*s_config_json)[name] = value;
