@@ -505,7 +505,7 @@ namespace linuxplorer::lxpsvc::workers {
 
 					if (helpers::path_helper::is_under(absolute_path, this->m_absolute_watching_path)) {
 						relative_path = absolute_path.lexically_relative(this->m_absolute_watching_path);
-						LOG_INFO(this->m_logger, "The file or directory path '{}' has been successfully resolved from its FRN.", absolute_path);
+						// LOG_INFO(this->m_logger, "The file or directory path '{}' has been successfully resolved from its FRN.", absolute_path);
 					}
 					else {
 						// LOG_INFO(this->m_logger, "The file or directory'{}' is not under the surveillance.", absolute_path);

@@ -113,15 +113,13 @@ namespace linuxplorer::lxpsvc::models::operations {
 			break;
 		}
 		}
-	
-		constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
 		
 		std::vector<range<std::size_t>> normalized_modified_ranges;
 		for (const auto& modified_range : modified_ranges) {
 			std::streamsize bytes_remaining = modified_range.get_length();
 			std::size_t relative_offset = 0;
 			do {
-				std::size_t length = std::min(unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
+				std::size_t length = std::min(s_unit_chunk_length, static_cast<std::size_t>(bytes_remaining));
 
 				normalized_modified_ranges.emplace_back(modified_range.get_offset() + relative_offset, length);
 

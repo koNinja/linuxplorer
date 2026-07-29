@@ -270,6 +270,8 @@ namespace linuxplorer::lxpsvc::models::operations {
 
 	class modification_operation : public stateful_io_operation<internal::modification_operation_state_traits> {
 	private:
+		inline static constexpr std::size_t s_unit_chunk_length = 2097152;	// 2MiB
+
 		mutable std::optional<std::vector<range<std::size_t>>> m_ranges;
 		void acquire_modified_ranges_if_consted() const;
 
@@ -331,14 +333,15 @@ namespace linuxplorer::lxpsvc::models::operations {
 	*/
 	class import_operation : public stateful_io_operation<internal::import_operation_state_traits> {
 	private:
+		inline static constexpr std::size_t s_unit_chunk_length = 2097152;	// 2MiB
+
 		const std::filesystem::recursive_directory_iterator m_rditr_end = std::filesystem::recursive_directory_iterator{};
 		std::filesystem::recursive_directory_iterator m_rditr;
 
 		std::size_t m_current_file_size;
 		std::size_t m_remaining_current_file_size;
 		inline std::size_t calculate_chunk_length() const noexcept {
-			constexpr std::size_t unit_chunk_length = 262144;	// 256KiB
-			return std::min(unit_chunk_length, this->m_remaining_current_file_size);
+			return std::min(s_unit_chunk_length, this->m_remaining_current_file_size);
 		}
 	protected:
 		virtual void transition_on_success() noexcept override;
@@ -355,12 +358,13 @@ namespace linuxplorer::lxpsvc::models::operations {
 	public:
 		using result_t = requests::remote::hydration_request::result_t;
 	private:
+		inline static constexpr std::size_t s_unit_chunk_length = 2097152;	// 2MiB
+
 		range<std::size_t> m_range;
 		std::size_t m_remaining_length;
 		inline range<std::size_t> calculate_range_to_download() const noexcept {
-			constexpr std::size_t unit_chunk_length = 2097152;	// 2 MiB
 			auto relative_offset = this->m_range.get_length() - this->m_remaining_length;
-			auto length = std::min(unit_chunk_length, this->m_remaining_length);
+			auto length = std::min(s_unit_chunk_length, this->m_remaining_length);
 
 			return range(this->m_range.get_offset() + relative_offset, length);
 		}

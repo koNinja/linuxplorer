@@ -98,6 +98,18 @@ namespace linuxplorer::lxpsvc::workers {
 		return s;
 	};
 
+	static std::string checksum_256_str(std::span<const std::byte> filedata) {
+		std::array<std::byte, SHA256_DIGEST_LENGTH> hash256{};
+		::SHA256(reinterpret_cast<const unsigned char*>(filedata.data()), filedata.size_bytes(), reinterpret_cast<unsigned char*>(hash256.data()));
+		std::ostringstream oss;
+
+		for (auto c : hash256) {
+			oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+		}
+
+		return oss.str();
+	}
+
 	operation_executor::request_visitor::request_visitor(
 		const ssh::sftp::sftp_session& sftp_session,
 		const shell::cloud_provider_session& cloud_provider_session,
@@ -219,10 +231,15 @@ namespace linuxplorer::lxpsvc::workers {
 
 			oss.flush();
 
+			auto checksum = checksum_256_str(buffer);
+
 			LOG_INFO(
 				this->m_logger,
-				"Changes to the file '{}' have been successfully applied on the server.",
-				absolute_client_path
+				"Changes to the file '{}' have been successfully applied on the server, offset: {}, length: {}, SHA256: {}",
+				absolute_client_path,
+				request.get_range().get_offset(),
+				request.get_range().get_length(),
+				checksum
 			);
 
 			return models::requests::request_result::success;
@@ -230,10 +247,12 @@ namespace linuxplorer::lxpsvc::workers {
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
 			LOG_ERROR(
 				this->m_logger,
-				"Failed to transfer file data to the server: {} (libssh2: {}({}))",
+				"Failed to transfer file data to the server: {} (libssh2: {}({})), offset: {}, length: {}",
 				e.what(),
 				e.code().message(),
-				e.code().value()
+				e.code().value(),
+				request.get_range().get_offset(),
+				request.get_range().get_length()
 			);
 
 			return models::requests::request_result::transient_failure;
@@ -364,23 +383,9 @@ namespace linuxplorer::lxpsvc::workers {
 			}
 			std::vector<std::byte> data(request.get_range().get_length());
 
-			LOG_INFO(
-				this->m_logger,
-				"Downloading for '{}', offset: {} bytes, length: {} bytes.",
-				server_path,
-				request.get_range().get_offset(),
-				request.get_range().get_length()
-			);
-
 			iss.read(reinterpret_cast<char*>(data.data()), request.get_range().get_length());
 
-			std::array<std::byte, SHA256_DIGEST_LENGTH> hash256{};
-			::SHA256(reinterpret_cast<unsigned char*>(data.data()), data.size() * sizeof(std::byte), reinterpret_cast<unsigned char*>(hash256.data()));
-			std::ostringstream oss;
-
-			for (auto c : hash256) {
-				oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
-			}
+			auto checksum = checksum_256_str(data);
 
 			LOG_INFO(
 				this->m_logger,
@@ -388,7 +393,7 @@ namespace linuxplorer::lxpsvc::workers {
 				server_path,
 				request.get_range().get_offset(),
 				request.get_range().get_length(),
-				oss.str()
+				checksum
 			);
 			
 			request.set_value(std::move(data));
@@ -397,10 +402,12 @@ namespace linuxplorer::lxpsvc::workers {
 		catch (const ssh::ssh_libssh2_sftp_exception& e) {
 			LOG_ERROR(
 				this->m_logger,
-				"Failed to read file data via isftpstream: {} (libssh2: {}({}))",
+				"Failed to read file data via isftpstream: {} (libssh2: {}({})), offset: {}, length: {}",
 				e.what(),
 				e.code().message(),
-				e.code().value()
+				e.code().value(),
+				request.get_range().get_offset(),
+				request.get_range().get_length()
 			);
 			request.set_exception(e);
 			return models::requests::request_result::transient_failure;
