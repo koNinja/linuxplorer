@@ -33,20 +33,20 @@ namespace linuxplorer::lxpsvc::workers {
 
 		this->m_execution_context.enqueue_task(std::move(operation));
 
-		std::size_t current_offset = 0;
+		std::size_t current_offset_from_bof = parameters.get_offset();
 		std::optional<models::operations::hydration_operation::result_t> result;
 		while ((result = adapter->wait_head())) {
 			auto length = result->size();
 
 			shell::functional::specialized::fetch_data_operation_info_yielded yielded;
 			yielded.set_length(length);
-			yielded.set_offset(current_offset);
-
+			yielded.set_offset_from_bof(current_offset_from_bof);
+			
 			yielded.set_buffer(std::move(*result));
 
 			co_yield yielded;
 
-			current_offset += length;
+			current_offset_from_bof += length;
 		}
 
 		co_return;
@@ -130,7 +130,7 @@ namespace linuxplorer::lxpsvc::workers {
 		std::unique_lock lock(this->m_cancellable_map_mutex);
 		auto itr = this->m_cancellable_operations.find(win32::get_frn(parameters.get_absolute_placeholder_path()));
 		if (itr == this->m_cancellable_operations.end()) return;
-
+		
 		if (this->m_execution_context.try_cancel_operation(itr->second)) {
 			LOG_INFO(this->m_logger, "A cancellation for the hydration operation #{} was successfully transmitted.", itr->second);
 		}

@@ -24,6 +24,8 @@
 #include <propkey.h>
 #include <shlwapi.h>
 
+#include <openssl/sha.h>
+
 #include "../win32/ntfs.hpp"
 #include "../models/lru_cache.hpp"
 
@@ -371,6 +373,23 @@ namespace linuxplorer::lxpsvc::workers {
 			);
 
 			iss.read(reinterpret_cast<char*>(data.data()), request.get_range().get_length());
+
+			std::array<std::byte, SHA256_DIGEST_LENGTH> hash256{};
+			::SHA256(reinterpret_cast<unsigned char*>(data.data()), data.size() * sizeof(std::byte), reinterpret_cast<unsigned char*>(hash256.data()));
+			std::ostringstream oss;
+
+			for (auto c : hash256) {
+				oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+			}
+
+			LOG_INFO(
+				this->m_logger,
+				"Successfully downloaded '{}', offset: {} bytes, length: {} bytes, SHA256: {}",
+				server_path,
+				request.get_range().get_offset(),
+				request.get_range().get_length(),
+				oss.str()
+			);
 			
 			request.set_value(std::move(data));
 			return models::requests::request_result::success;

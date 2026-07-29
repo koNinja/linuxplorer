@@ -57,6 +57,8 @@ target_link_libraries(${LINUXPLORER_APP_SERVICE_NAME}
 	cldapi
 	propsys
 	shlwapi
+	OpenSSL::Crypto
+	OpenSSL::SSL
 )
 install(TARGETS ${LINUXPLORER_APP_SERVICE_NAME}
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

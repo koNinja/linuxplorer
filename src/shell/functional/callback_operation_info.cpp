@@ -4,10 +4,10 @@
 #include <ntstatus.h>
 
 namespace linuxplorer::shell::functional::specialized {
-	std::size_t fetch_data_operation_info_yielded::get_offset() const noexcept {
+	std::size_t fetch_data_operation_info_yielded::get_offset_from_bof() const noexcept {
 		return this->m_offset;
 	}
-	void fetch_data_operation_info_yielded::set_offset(std::size_t offset) noexcept {
+	void fetch_data_operation_info_yielded::set_offset_from_bof(std::size_t offset) noexcept {
 		this->m_offset = offset;
 	}
 
