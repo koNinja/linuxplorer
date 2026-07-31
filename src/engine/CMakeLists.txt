@@ -1,0 +1,62 @@
+add_library(linuxplorer.engine SHARED)
+add_library(linuxplorer::engine ALIAS linuxplorer.engine)
+set(LINUXPLORER_ENGINE_DIR engine)
+target_compile_definitions(linuxplorer.engine
+	PRIVATE 
+	NOMINMAX
+	WIN32_LEAN_AND_MEAN
+	LINUXPLORER_ENGINE_API_IMPLEMENTATION
+)
+target_sources(linuxplorer.engine
+	PUBLIC
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/enginefwd.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/contexts/cancellation_map.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/contexts/execution_context.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/exceptions/abnormal_systems.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/helpers/path_helper.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/data_range.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/lru_cache.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/cancellation_context.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/operations/io_operations.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/requests/io_requests.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/requests/local/local_requests.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/requests/remote/remote_requests.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/requests/result_adapter.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/requests/result_drain.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/usn/usn_normalizer.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/services/profile_runtime.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/win32/handle.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/win32/ntfs.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/win32/overlapped.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/callback_table.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/filesystem_watcher.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/operation_executor.hpp
+	${LINUXPLORER_INCLUDE_DIR}/${LINUXPLORER_ENGINE_DIR}/resilience/session_keepalive.hpp
+	PRIVATE
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/contexts/execution_context.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/helpers/path_helper.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/models/operations/io_operations.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/win32/ntfs.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/win32/overlapped.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/services/profile_runtime.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/callback_table.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/filesystem_watcher.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/operation_executor.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/workers/request_visitor.cpp
+	${LINUXPLORER_SOURCE_DIR}/${LINUXPLORER_ENGINE_DIR}/resilience/session_keepalive.cpp
+)
+target_link_libraries(linuxplorer.engine
+	PRIVATE
+	linuxplorer::ssh
+	linuxplorer::shell
+	linuxplorer::util::charset
+	linuxplorer::util::config
+	libssh2::libssh2
+	quill::quill
+	cldapi
+	propsys
+	shlwapi
+	OpenSSL::Crypto
+	OpenSSL::SSL
+)
+install(TARGETS linuxplorer.engine RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
