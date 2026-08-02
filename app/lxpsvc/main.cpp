@@ -4,8 +4,6 @@
 
 #include <objbase.h>
 
-#include <quill/Backend.h>
-
 #define TO_WSTRING(x)	L#x
 #define WSTRINGIFY(x)	TO_WSTRING(x)
 
@@ -17,7 +15,8 @@ int APIENTRY wWinMain(::HINSTANCE hInstance, ::HINSTANCE, ::LPWSTR lpCmdLine, in
 	}
 
 	try {
-		quill::Backend::start();
+		linuxplorer::engine::services::try_initialize_logger_backend();
+
 		::HRESULT hr = ::CoInitializeEx(nullptr, ::COINIT::COINIT_MULTITHREADED);
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
@@ -90,7 +89,7 @@ int APIENTRY wWinMain(::HINSTANCE hInstance, ::HINSTANCE, ::LPWSTR lpCmdLine, in
 		return 1;
 	}
 
-	quill::Backend::stop();
+	linuxplorer::engine::services::try_uninitialize_logger_backend();
 	::CoUninitialize();
 
 	return 0;

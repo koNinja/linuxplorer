@@ -23,6 +23,10 @@
 #include <quill/Logger.h>
 
 namespace linuxplorer::engine::services {
+	bool LINUXPLORER_ENGINE_API has_logger_backend_initialized();
+	bool LINUXPLORER_ENGINE_API try_initialize_logger_backend();
+	bool LINUXPLORER_ENGINE_API try_uninitialize_logger_backend();
+
 	class LINUXPLORER_ENGINE_API profile_runtime {
 	public:
 		inline static constexpr std::chrono::seconds s_keepalive_duration{30};

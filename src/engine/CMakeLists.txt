@@ -1,11 +1,13 @@
 add_library(linuxplorer.engine SHARED)
 add_library(linuxplorer::engine ALIAS linuxplorer.engine)
 set(LINUXPLORER_ENGINE_DIR engine)
+set(LINUXPLORER_LOGGING_DOMAIN engine)
 target_compile_definitions(linuxplorer.engine
 	PRIVATE 
 	NOMINMAX
 	WIN32_LEAN_AND_MEAN
 	LINUXPLORER_ENGINE_API_IMPLEMENTATION
+	LINUXPLORER_LOGGING_DOMAIN=${LINUXPLORER_LOGGING_DOMAIN}
 )
 target_sources(linuxplorer.engine
 	PUBLIC

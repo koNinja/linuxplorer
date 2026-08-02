@@ -16,7 +16,6 @@ target_link_libraries(${LINUXPLORER_APP_SERVICE_NAME}
 	PRIVATE
 	linuxplorer::engine
 	linuxplorer::util::config
-	quill::quill
 	nlohmann_json::nlohmann_json
 )
 install(TARGETS ${LINUXPLORER_APP_SERVICE_NAME}

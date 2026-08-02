@@ -7,6 +7,7 @@
 
 #include <quill/LogMacros.h>
 
+#include <quill/Backend.h>
 #include <quill/Frontend.h>
 #include <quill/std/FilesystemPath.h>
 #include <quill/std/WideString.h>
@@ -16,6 +17,30 @@
 #define WSTRINGIFY(x)	TO_WSTRING(x)
 
 namespace linuxplorer::engine::services {
+	static bool has_initialized_once = false;
+
+	bool try_initialize_logger_backend() {
+		if (!has_initialized_once) {
+			quill::Backend::start();
+			has_initialized_once = true;
+			return true;
+		}
+		else return false;
+	}
+
+	bool try_uninitialize_logger_backend() {
+		if (has_initialized_once) {
+			quill::Backend::stop();
+			has_initialized_once = false;
+			return true;
+		}
+		else return false;
+	}
+
+	bool has_logger_backend_initialized() {
+		return has_initialized_once;
+	}
+	
 	profile_runtime::profile_runtime(const util::config::profile& profile) : m_profile(profile)
 	{
 		this->m_log_directory = util::config::configuration_manager::get_log_path() / profile.get_name();
@@ -72,7 +97,7 @@ namespace linuxplorer::engine::services {
 
 		auto logger_name = std::format(
 			L"{}::{}::{}",
-			WSTRINGIFY(LINUXPLORER_APP_SERVICE_NAME),
+			WSTRINGIFY(LINUXPLORER_LOGGING_DOMAIN),
 			this->m_profile.get_name(),
 			log_file_stem.wstring()
 		);
