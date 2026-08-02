@@ -13,8 +13,7 @@ target_sources(${LINUXPLORER_APP_MAIN_NAME} PRIVATE
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_MAIN_NAME}/commands.cpp
 	${LINUXPLORER_APP_DIR}/${LINUXPLORER_APP_MAIN_NAME}/main.cpp
 )
-target_link_libraries(
-	${LINUXPLORER_APP_MAIN_NAME}
+target_link_libraries(${LINUXPLORER_APP_MAIN_NAME} PRIVATE
 	linuxplorer::util::charset
 	linuxplorer::util::config
 	linuxplorer::ssh

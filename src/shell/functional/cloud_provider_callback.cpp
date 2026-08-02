@@ -27,13 +27,14 @@ namespace linuxplorer::shell::functional {
 
 		try {
 			std::size_t bytes_transferred = 0;
+			::LARGE_INTEGER progress_total{ .QuadPart = parameters->FetchData.RequiredFileOffset.QuadPart + parameters->FetchData.RequiredLength.QuadPart };
 
 			// The parameter object may have already been discarded if the function is called late.
 			// Thus the object must be binded by some variable.
 			auto coroutine_parameters = specialized::fetch_data_callback_parameters(info, parameters);
 			for (const auto& result : this->m_callback(coroutine_parameters)) {
 				operation_parameters.TransferData.CompletionStatus = STATUS_SUCCESS;
-				operation_parameters.TransferData.Offset.QuadPart = result.get_offset();
+				operation_parameters.TransferData.Offset.QuadPart = result.get_offset_from_bof();
 				operation_parameters.TransferData.Length.QuadPart = result.get_length();
 				operation_parameters.TransferData.Buffer = result.get_buffer().data();
 
@@ -44,7 +45,9 @@ namespace linuxplorer::shell::functional {
 
 				::LARGE_INTEGER transferred;
 				transferred.QuadPart = bytes_transferred;
-				::CfReportProviderProgress(info->ConnectionKey, info->TransferKey, parameters->FetchData.RequiredLength, transferred);
+
+				::LARGE_INTEGER progress_completed{ .QuadPart = parameters->FetchData.RequiredFileOffset.QuadPart + transferred.QuadPart };
+				::CfReportProviderProgress(info->ConnectionKey, info->TransferKey, progress_total, progress_completed);
 			}
 		}
 		catch (const shell::functional::callback_abort_exception& e) {
