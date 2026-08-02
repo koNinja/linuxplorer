@@ -37,7 +37,7 @@ namespace linuxplorer::engine::models::operations {
 			this->set_state(state_type::transforming);
 			break;
 		case state_type::transforming:
-			this->set_state(this->m_type == std::filesystem::file_type::directory ? creation_operation::state_type::committing : creation_operation::state_type::done);
+			this->set_state(state_type::committing);
 			break;
 		case state_type::committing:
 			this->finalize();
