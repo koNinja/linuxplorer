@@ -7,6 +7,7 @@
 #include <engine/win32/ntfs.hpp>
 #include <engine/win32/overlapped.hpp>
 #include <engine/contexts/execution_context.hpp>
+#include <engine/models/usn/usn_normalizer.hpp>
 
 #include <filesystem>
 #include <thread>
@@ -49,18 +50,17 @@ namespace linuxplorer::engine::workers {
 
 		quill::Logger* m_logger;
 
-		std::unordered_map<win32::file_reference_number, std::filesystem::path> map_frn_path(std::span<const std::byte> bytes_notify_info);
+		std::optional<std::filesystem::path> try_get_relative_path_from_syncroot_by_frn(const win32::file_reference_number& frn) const;
+
 		::USN parse_and_request_changes(
 			::DWORDLONG journal_id,
-			::USN read_start_at,
-			std::optional<::USN> read_until,
-			std::span<const std::byte> bytes_notify_info
+			::USN read_start_at
 		);
 
-		void raise_io_operations(const std::filesystem::path& relative_path, ::USN usn, std::uint32_t why);
+		void raise_io_operations(const std::filesystem::path& relative_path, const models::usn::operation_recognizer& recognizer, std::optional<models::requests::remote::modification_type> type);
 		bool try_raise_parent_directory_update_if(const std::filesystem::path& relative_path, const win32::file_reference_number& parent_frn);
 
-		bool auxiliarily_verify_execution_necessity_for_attribute(const std::filesystem::path& absolute_path) const noexcept;
+		bool check_execution_necessity_for_attrop(const std::filesystem::path& absolute_path) const noexcept;
 
 		std::filesystem::path m_absolute_watching_path;
 		std::filesystem::path m_root_name;

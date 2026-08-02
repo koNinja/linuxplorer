@@ -9,6 +9,8 @@
 
 namespace linuxplorer::engine::workers {
 	shell::functional::specialized::fetch_data_operation_info callback_table::on_fetch_data(const shell::functional::specialized::fetch_data_callback_parameters& parameters) {
+		::SetThreadDescription(::GetCurrentThread(), L"Fetch Data Callback");
+
 		auto operation = this->m_execution_context.get_factory().create_with_cancellation<models::operations::hydration_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path),
@@ -53,6 +55,8 @@ namespace linuxplorer::engine::workers {
 	}
 
 	shell::functional::specialized::fetch_placeholders_operation_info callback_table::on_fetch_placeholders(const shell::functional::callback_parameters& parameters) {
+		::SetThreadDescription(::GetCurrentThread(), L"Fetch Placeholders Callback");
+
 		auto operation = std::make_unique<models::operations::population_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path)
@@ -86,6 +90,8 @@ namespace linuxplorer::engine::workers {
 	}
 
 	shell::functional::specialized::delete_operation_info callback_table::on_deleted(const shell::functional::specialized::delete_callback_parameters& parameters) {
+		::SetThreadDescription(::GetCurrentThread(), L"Delete Callback");
+
 		auto operation = std::make_unique<models::operations::deletion_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path)
@@ -103,6 +109,8 @@ namespace linuxplorer::engine::workers {
 	}
 
 	shell::functional::operation_info callback_table::on_renamed(const shell::functional::specialized::rename_callback_parameters& parameters) {
+		::SetThreadDescription(::GetCurrentThread(), L"Rename Callback");
+
 		auto operation = std::make_unique<models::operations::renaming_operation>(
 			this->m_syncroot_path,
 			std::filesystem::relative(parameters.get_absolute_placeholder_path(), this->m_syncroot_path),
@@ -127,6 +135,8 @@ namespace linuxplorer::engine::workers {
 	}
 
 	void callback_table::on_cancel_fetch_data(const shell::functional::specialized::cancel_fetch_data_callback_parameters& parameters) {
+		::SetThreadDescription(::GetCurrentThread(), L"Cancel Fetch Data Callback");
+
 		std::unique_lock lock(this->m_cancellable_map_mutex);
 		auto itr = this->m_cancellable_operations.find(win32::get_frn(parameters.get_absolute_placeholder_path()));
 		if (itr == this->m_cancellable_operations.end()) return;
@@ -139,6 +149,8 @@ namespace linuxplorer::engine::workers {
 	}
 
 	void callback_table::on_cancel_fetch_placeholders(const shell::functional::callback_parameters& parameters) {
+		::SetThreadDescription(::GetCurrentThread(), L"Cancel Fetch Placeholders Callback");
+
 		std::unique_lock lock(this->m_cancellable_map_mutex);
 		auto itr = this->m_cancellable_operations.find(win32::get_frn(parameters.get_absolute_placeholder_path()));
 		if (itr == this->m_cancellable_operations.end()) return;

@@ -30,6 +30,8 @@ namespace linuxplorer::engine::workers {
 
 	void operation_executor::start() {
 		this->m_executor_thread = std::thread(&operation_executor::execute_operations, this);
+
+		::SetThreadDescription(this->m_executor_thread.native_handle(), L"Operation Executor");
 	}
 
 	operation_executor::~operation_executor() {
