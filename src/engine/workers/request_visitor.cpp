@@ -296,6 +296,13 @@ namespace linuxplorer::engine::workers {
 					request.get_absolute_path()
 				);
 			}
+			else {
+				LOG_INFO(
+					this->m_logger,
+					"The file or directory '{}' has already been removed from the server, so it will be skipped",
+					request.get_absolute_path()
+				);
+			}
 
 			request.set_value();
 			return models::requests::request_result::success;
@@ -768,12 +775,12 @@ namespace linuxplorer::engine::workers {
 	}
 
 	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::directory_update_request& request, std::stop_token token) {
-		try {
+		try {	
 			auto local_placeholder_names_lower = std::filesystem::directory_iterator(request.get_absolute_path()) |
 				std::ranges::views::transform([](const std::filesystem::directory_entry& entry) {
 					return std::filesystem::path(tolower_sys_localized(entry.path().wstring())).filename();
 				}) | std::ranges::to<std::unordered_set>();
-				
+
 			for (const auto& enumerated_entry : request.get_placeholder_set()) {
 				if (token.stop_requested()) {
 					LOG_INFO(this->m_logger, "The cancellation for this placeholder enumeration has been accepted.");
@@ -784,6 +791,10 @@ namespace linuxplorer::engine::workers {
 				auto enumerated_entry_name_lower = std::filesystem::path(tolower_sys_localized(enumerated_entry.get_relative_path().wstring()));
 
 				if (local_placeholder_names_lower.contains(enumerated_entry_name_lower)) {
+					local_placeholder_names_lower.erase(enumerated_entry_name_lower);
+
+					if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(enumerated_entry_path)) continue;
+
 					// update metadata
 					shell::filesystem::cloud_filter_placeholder placeholder(enumerated_entry_path);
 					placeholder.set_file_times(enumerated_entry.get_file_times());
@@ -812,8 +823,6 @@ namespace linuxplorer::engine::workers {
 						);
 						continue;
 					}
-
-					local_placeholder_names_lower.erase(enumerated_entry_name_lower);
 				}
 				else {
 					// create a new placeholder corresponding to the enumerated file from the server
@@ -836,6 +845,8 @@ namespace linuxplorer::engine::workers {
 				}
 
 				auto local_placeholder_path = request.get_absolute_path() / local_entry_name_lower;
+
+				if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(local_placeholder_path)) continue;
 
 				// remove orphaned placeholders
 				if (shell::filesystem::cloud_filter_placeholder(local_placeholder_path).is_marked_in_sync()) {
