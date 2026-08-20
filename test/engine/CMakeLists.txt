@@ -1,5 +1,6 @@
 add_executable(engine_test)
 target_sources(engine_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/result_adapter.cpp
 )
 target_link_libraries(engine_test PRIVATE 
     GTest::gtest
