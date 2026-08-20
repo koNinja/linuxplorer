@@ -24,6 +24,7 @@ namespace linuxplorer::ssh::sftp::filesystem {
 			break;
 		case open_permissions::write:
 			flags |= LIBSSH2_FXF_WRITE;
+			break;
 		default:
 			break;
 		}
