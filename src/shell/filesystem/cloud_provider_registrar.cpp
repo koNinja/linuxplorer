@@ -18,7 +18,7 @@ namespace linuxplorer::shell::filesystem {
 	}
 
 	cloud_provider_session cloud_provider_registrar::internal_register_provider(
-		std::wstring_view sync_root_dir,
+		const std::filesystem::path& sync_root_dir,
 		std::wstring_view provider_name,
 		std::wstring_view provider_version,
 		const registration_options* options
@@ -45,7 +45,7 @@ namespace linuxplorer::shell::filesystem {
 		policies.InSync = ::CF_INSYNC_POLICY::CF_INSYNC_POLICY_TRACK_FILE_CREATION_TIME | ::CF_INSYNC_POLICY::CF_INSYNC_POLICY_TRACK_DIRECTORY_CREATION_TIME;
 
 		::HRESULT hr = ::CfRegisterSyncRoot(
-			sync_root_dir.data(),
+			sync_root_dir.c_str(),
 			&registration,
 			&policies,
 			::CF_REGISTER_FLAGS::CF_REGISTER_FLAG_NONE
@@ -59,7 +59,7 @@ namespace linuxplorer::shell::filesystem {
 	}
 
 	cloud_provider_session cloud_provider_registrar::register_provider(
-		std::wstring_view sync_root_dir,
+		const std::filesystem::path& sync_root_dir,
 		std::wstring_view provider_name,
 		std::wstring_view provider_version
 	) {
@@ -67,7 +67,7 @@ namespace linuxplorer::shell::filesystem {
 	}
 
 	cloud_provider_session cloud_provider_registrar::register_provider(
-		std::wstring_view sync_root_dir,
+		const std::filesystem::path& sync_root_dir,
 		std::wstring_view provider_name,
 		std::wstring_view provider_version,
 		const registration_options& options
@@ -75,8 +75,8 @@ namespace linuxplorer::shell::filesystem {
 		return internal_register_provider(sync_root_dir, provider_name, provider_version, &options);
 	}
 
-	void cloud_provider_registrar::unregister_provider(std::wstring_view sync_root_dir) {
-		::HRESULT hr = ::CfUnregisterSyncRoot(sync_root_dir.data());
+	void cloud_provider_registrar::unregister_provider(const std::filesystem::path& sync_root_dir) {
+		::HRESULT hr = ::CfUnregisterSyncRoot(sync_root_dir.c_str());
 		if (FAILED(hr)) {
 			std::error_code ec(hr, std::system_category());
 			throw cloud_provider_system_error(ec, "Failed to unregister cloud provider");

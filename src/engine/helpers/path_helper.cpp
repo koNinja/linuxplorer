@@ -1,0 +1,146 @@
+#include <engine/helpers/path_helper.hpp>
+
+#include <string>
+#include <regex>
+#include <cwctype>
+#include <algorithm>
+
+namespace linuxplorer::engine::helpers {
+	path_helper::path_helper(const std::filesystem::path& syncroot, const std::filesystem::path& linux_root) : m_syncroot(syncroot), m_linux_root(linux_root) {}
+
+	std::filesystem::path path_helper::to_relative_from_syncroot(const std::filesystem::path& absolute_path) const {
+		return absolute_path.lexically_relative(this->m_syncroot);
+	}
+
+	std::filesystem::path path_helper::to_absolute(const std::filesystem::path& relative_path_from_syncroot) const {
+		return this->m_syncroot / relative_path_from_syncroot;
+	}
+
+	std::filesystem::path path_helper::to_linux_style(const std::filesystem::path& path, style_conversion_class conversion_class) const {
+		std::filesystem::path result;
+		std::wstring relative_path_str;
+
+		switch (conversion_class) {
+		case style_conversion_class::relative_format:
+		{
+			relative_path_str = path.wstring();
+			break;
+		}
+		case style_conversion_class::absolute_format:
+		{
+			relative_path_str = this->to_relative_from_syncroot(path).wstring();
+			break;
+		}
+		default:
+			break;
+		}
+
+		std::replace(relative_path_str.begin(), relative_path_str.end(), L'\\', L'/');
+		if (this->m_linux_root.wstring().ends_with(L'/')) {
+			result =  this->m_linux_root.wstring() + relative_path_str;
+		}
+		else {
+			result =  this->m_linux_root.wstring() + L"/" + relative_path_str;
+		}
+
+		return result;
+	}
+
+	std::filesystem::path path_helper::to_win_style(style_conversion_class conversion_class, const std::filesystem::path& linux_style_path) const {
+		if (linux_style_path.empty()) return L"";
+
+		// Normalize the path by removing redundant separators and replacing '/' with '\\'
+		auto normalize_win_format = [](const std::filesystem::path& linux_style_path) {
+			std::wstring out;
+			
+			bool prev_separator = false;
+			for (auto c : linux_style_path.wstring()) {
+				if (c == L'/') {
+					if (!prev_separator) out += c;
+					prev_separator = true;
+				} else {
+					out += c;
+					prev_separator = false;
+				}
+			}
+
+			if (out.size() > 1 && out.back() == L'/') out.pop_back();
+
+			std::replace(out.begin(), out.end(), L'/', L'\\');
+
+			return std::filesystem::path(out);
+		};
+
+		auto relative_path = normalize_win_format(linux_style_path).lexically_relative(normalize_win_format(this->m_linux_root));
+
+		switch (conversion_class) {
+		case style_conversion_class::relative_format:
+		{
+			return relative_path;
+		}
+		case style_conversion_class::absolute_format:
+		{
+			return this->to_absolute(relative_path);
+		}
+		default:
+			throw std::invalid_argument("Invalid style conversion class.");
+		}
+	}
+
+	bool path_helper::is_under(const std::filesystem::path& path, const std::filesystem::path& base) {
+		auto normalize = [](const std::filesystem::path& path)
+		{
+			auto p = path.lexically_normal();
+
+			std::wstring s = p.native();
+			std::transform(s.begin(), s.end(), s.begin(),
+				[](wchar_t c){ return std::towlower(c); });
+
+			return std::filesystem::path(s);
+		};
+
+		std::filesystem::path p = normalize(path);
+		std::filesystem::path b = normalize(base);
+
+		if (p == b) return false;
+
+		if (p.root_name() != b.root_name()) return false;
+
+		std::filesystem::path rel = p.lexically_relative(b);
+
+		if (rel.empty()) return false;
+
+		if (*rel.begin() == "..") return false;
+
+		return true;
+	}
+
+	const std::filesystem::path& path_helper::get_syncroot() const noexcept {
+		return this->m_syncroot;
+	}
+
+	bool path_helper::contains_invalid_ntfs_character(const std::filesystem::path& path) {
+		auto path_str = path.wstring();
+
+		static std::wregex invalid_pattern(LR"([<>:"/\\|?*])");
+
+		if (std::regex_search(path_str.cbegin(), path_str.cend(), invalid_pattern)) return true;
+
+		static std::wregex invalid_end_pattern(LR"([ \.]$)");
+		if (std::regex_search(path_str.cbegin(), path_str.cend(), invalid_end_pattern)) return true;
+
+		static std::wregex reserved_pattern(LR"(^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$)", std::regex_constants::icase);
+		if (std::regex_search(path_str.cbegin(), path_str.cend(), reserved_pattern)) return true;
+
+		return false;
+	}
+
+	std::filesystem::path path_helper::tolower_localized(const std::filesystem::path& path) {
+		auto s = path.wstring();
+		std::locale loc("");
+		std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) {
+			return std::tolower(c, loc); }
+		);
+		return s;
+	}
+}

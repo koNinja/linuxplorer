@@ -4,7 +4,7 @@
 #include <ssh/sshfwd.hpp>
 #include <ssh/ssh_session.hpp>
 #include <ssh/ssh_exception.hpp>
-#include <string_view>
+#include <filesystem>
 #include <memory>
 
 namespace linuxplorer::ssh::auth {
@@ -30,9 +30,9 @@ namespace linuxplorer::ssh::auth {
 		const ssh_session& m_session;
 
 		internal::unique_ssh_knownhosts_ptr m_knownhosts;
-		std::wstring m_knownhosts_path;
+		std::filesystem::path m_knownhosts_path;
 	public:
-		ssh_knownhosts(const ssh_session& host, std::wstring_view path = default_knownhosts_path);
+		ssh_knownhosts(const ssh_session& host, const std::filesystem::path& path = default_knownhosts_path);
 
 		ssh_knownhosts(const ssh_knownhosts&) = delete;
 		ssh_knownhosts(ssh_knownhosts&&) = default;

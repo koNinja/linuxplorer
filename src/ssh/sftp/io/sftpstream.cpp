@@ -1,9 +1,8 @@
 #include <ssh/sftp/io/sftpstream.hpp>
 #include <ssh/ssh_exception.hpp>
-#include <util/charset/multibyte_wide_compat_helper.hpp>
 
 namespace linuxplorer::ssh::sftp::io {
-	sftpbuf::sftpbuf(sftpbuf&& rhs) noexcept : m_sftp(std::move(rhs.m_sftp)), m_handle(std::move(rhs.m_handle)) {
+	sftpbuf::sftpbuf(sftpbuf&& rhs) noexcept : std::basic_streambuf<char>(std::move(rhs)), m_sftp(std::move(rhs.m_sftp)), m_handle(std::move(rhs.m_handle)) {
 		this->m_in_seek = rhs.m_in_seek;
 		this->m_out_seek = rhs.m_out_seek;
 		this->m_inbufsize = rhs.m_inbufsize;
@@ -201,12 +200,20 @@ namespace linuxplorer::ssh::sftp::io {
 		return pos;
 	}
 
-	isftpstream::isftpstream(isftpstream&& right) : std::basic_istream<char>(nullptr) {
-		this->m_buffer = std::move(right.m_buffer);
+	isftpstream::isftpstream(isftpstream&& rhs) : std::basic_istream<char>(nullptr), m_mode(rhs.m_mode), m_buffer(std::move(rhs.m_buffer)) {
 		this->init(this->m_buffer.get());
 	}
 
-	isftpstream::isftpstream(const sftp_session& session, std::wstring_view s, std::ios_base::openmode mode) : std::basic_istream<char>(nullptr)
+	isftpstream& isftpstream::operator=(isftpstream&& rhs) {
+		if (this != &rhs) {
+			this->m_buffer = std::move(rhs.m_buffer);
+			this->m_mode = rhs.m_mode;
+			this->init(this->m_buffer.get());
+		}
+		return *this;
+	}
+
+	isftpstream::isftpstream(const sftp_session& session, const std::filesystem::path& s, std::ios_base::openmode mode) : std::basic_istream<char>(nullptr), m_mode(mode)
 	{
 		unsigned long flags = 0;
 
@@ -222,9 +229,14 @@ namespace linuxplorer::ssh::sftp::io {
 		
 		auto sftp = session.get_session();
 
-		auto path = util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(s);
-
-		auto handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, LIBSSH2_FXF_READ, LIBSSH2_SFTP_OPENFILE);
+		auto handle = ::libssh2_sftp_open_ex(
+			sftp,
+			reinterpret_cast<const char*>(s.u8string().c_str()),
+			s.u8string().length() * sizeof(char8_t),
+			flags,
+			LIBSSH2_FXF_READ,
+			LIBSSH2_SFTP_OPENFILE
+		);
 		if (!handle) {
 			throw ssh_libssh2_sftp_exception(std::error_code(session.get_last_errno(), libssh2_sftp_category()), "Failed to open file.");
 		}
@@ -241,7 +253,11 @@ namespace linuxplorer::ssh::sftp::io {
 		this->init(this->m_buffer.get());
 	}
 
-	osftpstream::osftpstream(const sftp_session& session, std::wstring_view s, std::ios_base::openmode mode, long permissions_created) : std::basic_ostream<char>(nullptr)
+	std::ios_base::openmode isftpstream::mode() const noexcept {
+		return this->m_mode;
+	}
+
+	osftpstream::osftpstream(const sftp_session& session, const std::filesystem::path& s, std::ios_base::openmode mode, long permissions_created) : std::basic_ostream<char>(nullptr), m_mode(mode)
 	{
 		unsigned long flags = LIBSSH2_FXF_CREAT;
 
@@ -257,9 +273,14 @@ namespace linuxplorer::ssh::sftp::io {
 		
 		auto sftp = session.get_session();
 
-		auto path = util::charset::multibyte_wide_compat_helper::convert_wide_to_multibyte(s);
-
-		auto handle = ::libssh2_sftp_open_ex(sftp, path.c_str(), path.length() * sizeof(char), flags, permissions_created, LIBSSH2_SFTP_OPENFILE);
+		auto handle = ::libssh2_sftp_open_ex(
+			sftp,
+			reinterpret_cast<const char*>(s.u8string().c_str()),
+			s.u8string().length() * sizeof(char8_t),
+			flags,
+			permissions_created,
+			LIBSSH2_SFTP_OPENFILE
+		);
 		if (!handle) {
 			throw ssh_libssh2_sftp_exception(std::error_code(session.get_last_errno(), libssh2_sftp_category()), "Failed to open file.");
 		}
@@ -276,8 +297,20 @@ namespace linuxplorer::ssh::sftp::io {
 		this->init(this->m_buffer.get());
 	}
 
-	osftpstream::osftpstream(osftpstream&& right) : std::basic_ostream<char>(nullptr) {
-		this->m_buffer = std::move(right.m_buffer);
+	osftpstream::osftpstream(osftpstream&& rhs) : std::basic_ostream<char>(nullptr), m_mode(rhs.m_mode), m_buffer(std::move(rhs.m_buffer)) {
 		this->init(this->m_buffer.get());
+	}
+
+	osftpstream& osftpstream::operator=(osftpstream&& rhs) {
+		if (this != &rhs) {
+			this->m_buffer = std::move(rhs.m_buffer);
+			this->m_mode = rhs.m_mode;
+			this->init(this->m_buffer.get());
+		}
+		return *this;
+	}
+
+	std::ios_base::openmode osftpstream::mode() const noexcept {
+		return this->m_mode;
 	}
 }

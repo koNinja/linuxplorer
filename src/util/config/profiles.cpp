@@ -453,7 +453,7 @@ namespace linuxplorer::util::config {
 			::RtlSecureZeroMemory(decrypted_key.get(), decrypted_key_length);
 			::RtlSecureZeroMemory(decrypted_cred_data.get(), decrypted_cred_data_length);
 
-			profiles.emplace_back(chcvt::convert_multibyte_to_wide(raw_name), chcvt::convert_multibyte_to_wide(raw_syncroot), port, std::move(cred));
+			profiles.emplace_back(chcvt::convert_multibyte_to_wide(raw_name), std::filesystem::path(raw_syncroot), port, std::move(cred));
 		}
 
 		this->m_data = std::move(profiles);
@@ -506,7 +506,7 @@ namespace linuxplorer::util::config {
 			profile_config::encode_to_base64(normalized_cred_data.get(), normalized_cred_data_length, cred_data_to_write);
 
 			auto raw_name = chcvt::convert_wide_to_multibyte(profile.get_name());
-			auto raw_syncroot = chcvt::convert_wide_to_multibyte(profile.get_syncroot());
+			auto raw_syncroot = profile.get_syncroot().string();
 			nlohmann::json raw_profile = {
 				{ "name", raw_name },
 				{ "syncroot", raw_syncroot },
