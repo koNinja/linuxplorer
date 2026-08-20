@@ -42,6 +42,7 @@ namespace linuxplorer::engine::workers {
 			quill::Logger* m_logger;
 			helpers::path_helper m_path_helper;
 			std::list<win32::overlapped>& m_pending_hydrations;
+			const contexts::execution_context& m_execution_context;
 
 			struct stream_cache_wrapper {
 			public:
@@ -65,6 +66,7 @@ namespace linuxplorer::engine::workers {
 				const ssh::sftp::sftp_session& sftp_session,
 				const shell::cloud_provider_session& cloud_provider_session,
 				std::list<win32::overlapped>& pending_hydrations,
+				const contexts::execution_context& execution_context,
 				quill::Logger* logger
 			);
 
@@ -95,7 +97,11 @@ namespace linuxplorer::engine::workers {
 		quill::Logger* m_logger;
 
 		std::list<win32::overlapped> m_pending_hydrations;
+		helpers::path_helper m_path_helper;
 
+		/*
+			 Note: Since the fields of this class are used as arguments for the request_visitor constructor, this must be declared last.
+		*/
 		request_visitor m_visitor;
 	public:
 		operation_executor(

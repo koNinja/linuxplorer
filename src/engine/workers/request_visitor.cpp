@@ -30,20 +30,6 @@
 #include <engine/models/lru_cache.hpp>
 
 namespace linuxplorer::engine::workers {
-	static bool contains_invalid_ntfs_character(std::wstring_view path) {
-		static std::wregex invalid_pattern(LR"([<>:"/\\|?*])");
-
-		if (std::regex_search(path.cbegin(), path.cend(), invalid_pattern)) return true;
-
-		static std::wregex invalid_end_pattern(LR"([ \.]$)");
-		if (std::regex_search(path.cbegin(), path.cend(), invalid_end_pattern)) return true;
-
-		static std::wregex reserved_pattern(LR"(^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$)", std::regex_constants::icase);
-		if (std::regex_search(path.cbegin(), path.cend(), reserved_pattern)) return true;
-
-		return false;
-	}
-
 	static ::HRESULT raise_warning_state(const std::filesystem::path& path, bool has_warning) {
 		::HRESULT hr;
 
@@ -89,15 +75,6 @@ namespace linuxplorer::engine::workers {
 		return hr;
 	}
 
-	static std::wstring tolower_sys_localized(std::wstring_view str) {
-		std::wstring s(str);
-		std::locale loc("");
-		std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) {
-			return std::tolower(c, loc); }
-		);
-		return s;
-	};
-
 	static std::string checksum_256_str(std::span<const std::byte> filedata) {
 		std::array<std::byte, SHA256_DIGEST_LENGTH> hash256{};
 		::SHA256(reinterpret_cast<const unsigned char*>(filedata.data()), filedata.size_bytes(), reinterpret_cast<unsigned char*>(hash256.data()));
@@ -114,10 +91,11 @@ namespace linuxplorer::engine::workers {
 		const ssh::sftp::sftp_session& sftp_session,
 		const shell::cloud_provider_session& cloud_provider_session,
 		std::list<win32::overlapped>& pending_hydrations,
+		const contexts::execution_context& execution_context,
 		quill::Logger* logger
 	) : m_logger(logger), m_cloud_provider_session(cloud_provider_session),
 		m_sftp_session(sftp_session), m_path_helper(cloud_provider_session.get_sync_root_dir()),
-		m_pending_hydrations(pending_hydrations)
+		m_execution_context(execution_context), m_pending_hydrations(pending_hydrations)
 	{}
 
 	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::remote::creation_request& request, std::stop_token token) {
@@ -472,7 +450,7 @@ namespace linuxplorer::engine::workers {
 				);
 				metadata.set_identity({ std::byte(0) });
 
-				std::filesystem::path placeholder_name_lower = tolower_sys_localized(placeholder_name.wstring());
+				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower_localized(placeholder_name);
 				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
 					LOG_WARNING(
 						this->m_logger,
@@ -499,7 +477,7 @@ namespace linuxplorer::engine::workers {
 				}
 				existent_files_in_server_lower.emplace(placeholder_name_lower);
 				
-				if (contains_invalid_ntfs_character(placeholder_name.wstring())) {
+				if (helpers::path_helper::contains_invalid_ntfs_character(placeholder_name.wstring())) {
 					LOG_INFO(this->m_logger, "Skip '{}' because its name contains invalid characters in NTFS.", placeholder_name);
 					skipped++;
 					continue;
@@ -560,6 +538,11 @@ namespace linuxplorer::engine::workers {
 				placeholder.set_pin_state(shell::filesystem::placeholder_pin_state::unpinned);
 				placeholder.flush();
 				LOG_INFO(this->m_logger, "The file '{}' has been successfully unpinned.", request.get_absolute_path());
+				break;
+			case models::requests::local::attribute_request::change_domain::pin_unspecified:
+				placeholder.set_pin_state(shell::filesystem::placeholder_pin_state::unspecified);
+				placeholder.flush();
+				LOG_INFO(this->m_logger, "The file '{}' has been successfully set to pin state unspecified.", request.get_absolute_path());
 				break;
 			case models::requests::local::attribute_request::change_domain::enable_placeholder_enumeration:
 			{
@@ -725,7 +708,7 @@ namespace linuxplorer::engine::workers {
 					file_times
 				);
 
-				std::filesystem::path placeholder_name_lower = tolower_sys_localized(placeholder_name.wstring());
+				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower_localized(placeholder_name.wstring());
 				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
 					LOG_WARNING(
 						this->m_logger,
@@ -750,7 +733,7 @@ namespace linuxplorer::engine::workers {
 				}
 				existent_files_in_server_lower.emplace(placeholder_name_lower);
 
-				if (contains_invalid_ntfs_character(placeholder_name.wstring())) {
+				if (helpers::path_helper::contains_invalid_ntfs_character(placeholder_name.wstring())) {
 					LOG_INFO(this->m_logger, "Skip '{}' because its name contains invalid characters in NTFS.", placeholder_name);
 					continue;
 				}
@@ -775,10 +758,10 @@ namespace linuxplorer::engine::workers {
 	}
 
 	models::requests::request_result operation_executor::request_visitor::operator()(models::requests::local::directory_update_request& request, std::stop_token token) {
-		try {	
+		try {
 			auto local_placeholder_names_lower = std::filesystem::directory_iterator(request.get_absolute_path()) |
 				std::ranges::views::transform([](const std::filesystem::directory_entry& entry) {
-					return std::filesystem::path(tolower_sys_localized(entry.path().wstring())).filename();
+					return std::filesystem::path(helpers::path_helper::tolower_localized(entry.path().wstring())).filename();
 				}) | std::ranges::to<std::unordered_set>();
 
 			for (const auto& enumerated_entry : request.get_placeholder_set()) {
@@ -788,12 +771,17 @@ namespace linuxplorer::engine::workers {
 				}
 
 				auto enumerated_entry_path = request.get_absolute_path() / enumerated_entry.get_relative_path();
-				auto enumerated_entry_name_lower = std::filesystem::path(tolower_sys_localized(enumerated_entry.get_relative_path().wstring()));
+				auto enumerated_entry_name_lower = std::filesystem::path(helpers::path_helper::tolower_localized(enumerated_entry.get_relative_path().wstring()));
 
 				if (local_placeholder_names_lower.contains(enumerated_entry_name_lower)) {
 					local_placeholder_names_lower.erase(enumerated_entry_name_lower);
 
-					if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(enumerated_entry_path)) continue;
+					if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(enumerated_entry_path) ||
+						this->m_execution_context.is_placeholder_pending(win32::get_frn(enumerated_entry_path))
+						) {
+						LOG_INFO(this->m_logger, "This request is being voluntarily cancelled because the target directory may be in a transitional state.");
+						return models::requests::request_result::cancelled;
+					}
 
 					// update metadata
 					shell::filesystem::cloud_filter_placeholder placeholder(enumerated_entry_path);
@@ -846,7 +834,12 @@ namespace linuxplorer::engine::workers {
 
 				auto local_placeholder_path = request.get_absolute_path() / local_entry_name_lower;
 
-				if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(local_placeholder_path)) continue;
+				if (!shell::filesystem::cloud_filter_placeholder::is_placeholder(local_placeholder_path) ||
+					this->m_execution_context.is_placeholder_pending(win32::get_frn(local_placeholder_path))
+					) {
+					LOG_INFO(this->m_logger, "This request is being voluntarily cancelled because the target directory may be in a transitional state.");
+					return models::requests::request_result::cancelled;
+				}
 
 				// remove orphaned placeholders
 				if (shell::filesystem::cloud_filter_placeholder(local_placeholder_path).is_marked_in_sync()) {

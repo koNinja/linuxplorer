@@ -312,6 +312,11 @@ namespace linuxplorer::engine::workers {
 	bool filesystem_watcher::try_raise_parent_directory_update_if(const std::filesystem::path& relative_path, const win32::file_reference_number& parent_frn) {
 		auto absolute_path = this->m_absolute_watching_path / relative_path;
 
+		if (this->m_execution_context.is_directory_update_suppressed(relative_path)) {
+			this->m_execution_context.try_release_directory_update_suppression(relative_path);
+			return false;
+		}
+
 		if (::GetFileAttributesW(absolute_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) return false;
 
 		static std::unordered_map<win32::file_reference_number, std::chrono::system_clock::time_point> last_updated_times;

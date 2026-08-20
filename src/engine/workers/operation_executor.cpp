@@ -11,10 +11,11 @@ namespace linuxplorer::engine::workers {
 		contexts::execution_context& execution_context,
 		std::mutex& sftp_mutex,
 		quill::Logger* logger
-	) : 
-		m_logger(logger), m_execution_context(execution_context), 
+	) :
+		m_logger(logger), m_execution_context(execution_context),
 		m_executor_state(operation_executor_state::pending), m_sftp_mutex(sftp_mutex),
-		m_visitor(sftp_session, cloud_provider_session, this->m_pending_hydrations, logger)
+		m_visitor(sftp_session, cloud_provider_session, this->m_pending_hydrations, execution_context, logger),
+		m_path_helper(cloud_provider_session.get_sync_root_dir())
 	{
 		this->m_termination_event = ::CreateEventW(nullptr, true, false, nullptr);
 		if (!this->m_termination_event) {
@@ -154,6 +155,7 @@ namespace linuxplorer::engine::workers {
 
 			LOG_INFO(this->m_logger, "Start processing operation #{}.", nullable_task->get_id());
 
+			this->m_execution_context.suppress_directory_update(this->m_path_helper.to_relative_from_syncroot(nullable_task->get_absolute_path().parent_path()), true);
 			while (!nullable_task->done()) {
 				try {
 					if (nullable_task->get_stop_token().stop_requested()) {
@@ -211,6 +213,8 @@ namespace linuxplorer::engine::workers {
 				LOG_ERROR(this->m_logger, "Operation #{} has an unknown result.", nullable_task->get_id());
 				break;
 			}
+
+			this->m_execution_context.try_release_directory_update_suppression(this->m_path_helper.to_relative_from_syncroot(nullable_task->get_absolute_path().parent_path()));
 		}
 		catch (...) {
 			LOG_ERROR(this->m_logger, "Failed to parse an I/O event.");

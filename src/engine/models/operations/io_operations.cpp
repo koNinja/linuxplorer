@@ -510,6 +510,13 @@ namespace linuxplorer::engine::models::operations {
 				*this->m_adapter
 			);
 		}
+		case state_type::comitting:
+		{
+			return requests::local::attribute_request(
+				this->get_absolute_path(),
+				requests::local::attribute_request::change_domain::pin_unspecified
+			);
+		}
 		default:
 			throw invalid_state_exception("The state machine has already been completed.");
 		}
@@ -523,10 +530,15 @@ namespace linuxplorer::engine::models::operations {
 			this->m_remaining_length -= range.get_length();
 
 			if (this->m_remaining_length == 0) {
-				this->finalize();
 				this->m_adapter->finalize();
+				this->set_state(state_type::comitting);
 			}
 
+			break;
+		}
+		case state_type::comitting:
+		{
+			this->finalize();
 			break;
 		}
 		default:
@@ -683,6 +695,10 @@ namespace linuxplorer::engine::models::operations {
 		{
 			shell::filesystem::cloud_filter_placeholder placeholder(this->get_absolute_path());
 
+			if (placeholder.get_pin_state() != shell::filesystem::placeholder_pin_state::pinned) {
+				return false;
+			}
+
 			::LARGE_INTEGER catalog_file_size{ .QuadPart = 0 };
 			::GetFileSizeEx(placeholder.get_handle(), &catalog_file_size);
 
@@ -712,6 +728,10 @@ namespace linuxplorer::engine::models::operations {
 		case operation_reason::unpinned:
 		{
 			shell::filesystem::cloud_filter_placeholder placeholder(this->get_absolute_path());
+
+			if (placeholder.get_pin_state() != shell::filesystem::placeholder_pin_state::unpinned) {
+				return false;
+			}
 
 			::CF_FILE_RANGE range_to_verify;
 			::DWORD bytes_returned;

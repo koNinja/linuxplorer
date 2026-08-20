@@ -248,7 +248,7 @@ namespace linuxplorer::engine::models::operations {
 			uploading_child,
 			committing_child
 		);
-		DECLARE_STATE_TRAITS(hydration_operation, downloading);
+		DECLARE_STATE_TRAITS(hydration_operation, downloading, comitting);
 		DECLARE_STATE_TRAITS(population_operation, enumerating, cleaning_up, metadata_comitting);
 		DECLARE_STATE_TRAITS(attribute_operation, applying, committing);
 		DECLARE_STATE_TRAITS(directory_update_operation, enumerating, entry_comitting, committing);

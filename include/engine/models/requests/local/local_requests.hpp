@@ -12,6 +12,7 @@ namespace linuxplorer::engine::models::requests::local {
 		enum class change_domain {
 			pin,
 			unpin,
+			pin_unspecified,
 			mark_in_sync,
 			unmark_in_sync,
 			enable_placeholder_enumeration

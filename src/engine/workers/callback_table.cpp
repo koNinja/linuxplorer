@@ -3,6 +3,8 @@
 #include <ntstatus.h>
 #include <engine/models/operations/io_operations.hpp>
 
+#include <engine/win32/ntfs.hpp>
+
 #include <quill/Backend.h>
 #include <quill/LogMacros.h>
 #include <quill/std/FilesystemPath.h>
@@ -10,6 +12,9 @@
 namespace linuxplorer::engine::workers {
 	shell::functional::specialized::fetch_data_operation_info callback_table::on_fetch_data(const shell::functional::specialized::fetch_data_callback_parameters& parameters) {
 		::SetThreadDescription(::GetCurrentThread(), L"Fetch Data Callback");
+
+		auto frn = win32::get_frn(parameters.get_absolute_placeholder_path());
+		this->m_execution_context.mark_placeholder_as_pending(frn);
 
 		auto operation = this->m_execution_context.get_factory().create_with_cancellation<models::operations::hydration_operation>(
 			this->m_syncroot_path,
@@ -36,8 +41,7 @@ namespace linuxplorer::engine::workers {
 		this->m_execution_context.enqueue_task(std::move(operation));
 
 		std::size_t current_offset_from_bof = parameters.get_offset();
-		std::optional<models::operations::hydration_operation::result_t> result;
-		while ((result = adapter->wait_head())) {
+		while (auto result = adapter->wait_head()) {
 			auto length = result->size();
 
 			shell::functional::specialized::fetch_data_operation_info_yielded yielded;
@@ -51,11 +55,15 @@ namespace linuxplorer::engine::workers {
 			current_offset_from_bof += length;
 		}
 
+		this->m_execution_context.unmark_placeholder_as_pending(frn);
 		co_return;
 	}
 
 	shell::functional::specialized::fetch_placeholders_operation_info callback_table::on_fetch_placeholders(const shell::functional::callback_parameters& parameters) {
 		::SetThreadDescription(::GetCurrentThread(), L"Fetch Placeholders Callback");
+
+		auto frn = win32::get_frn(parameters.get_absolute_placeholder_path());
+		this->m_execution_context.mark_placeholder_as_pending(frn);
 
 		auto operation = std::make_unique<models::operations::population_operation>(
 			this->m_syncroot_path,
@@ -86,11 +94,15 @@ namespace linuxplorer::engine::workers {
 			info.add_creation_info(std::move(creation_info));
 		}
 
+		this->m_execution_context.unmark_placeholder_as_pending(frn);
 		return info;
 	}
 
 	shell::functional::specialized::delete_operation_info callback_table::on_deleted(const shell::functional::specialized::delete_callback_parameters& parameters) {
 		::SetThreadDescription(::GetCurrentThread(), L"Delete Callback");
+
+		auto frn = win32::get_frn(parameters.get_absolute_placeholder_path());
+		this->m_execution_context.mark_placeholder_as_pending(frn);
 
 		auto operation = std::make_unique<models::operations::deletion_operation>(
 			this->m_syncroot_path,
@@ -105,11 +117,15 @@ namespace linuxplorer::engine::workers {
 
 		while (adapter->wait_head());
 
+		this->m_execution_context.unmark_placeholder_as_pending(frn);
 		return {};
 	}
 
 	shell::functional::operation_info callback_table::on_renamed(const shell::functional::specialized::rename_callback_parameters& parameters) {
 		::SetThreadDescription(::GetCurrentThread(), L"Rename Callback");
+
+		auto frn = win32::get_frn(parameters.get_absolute_placeholder_path());
+		this->m_execution_context.mark_placeholder_as_pending(frn);
 
 		auto operation = std::make_unique<models::operations::renaming_operation>(
 			this->m_syncroot_path,
@@ -131,6 +147,7 @@ namespace linuxplorer::engine::workers {
 
 		while (adapter->wait_head());
 
+		this->m_execution_context.unmark_placeholder_as_pending(frn);
 		return {};
 	}
 
