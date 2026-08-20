@@ -13,6 +13,8 @@ namespace linuxplorer::engine::helpers {
 	class LINUXPLORER_ENGINE_API path_helper {
 	public:
 		static bool is_under(const std::filesystem::path& path, const std::filesystem::path& base);
+		static bool contains_invalid_ntfs_character(const std::filesystem::path& path);
+		static std::filesystem::path tolower_localized(const std::filesystem::path& path);
 	private:
 		std::filesystem::path m_syncroot;
 		std::filesystem::path m_linux_root;
@@ -26,6 +28,7 @@ namespace linuxplorer::engine::helpers {
 
 		std::filesystem::path to_linux_style(const std::filesystem::path& path, style_conversion_class conversion_class) const;
 		std::filesystem::path to_win_style(style_conversion_class conversion_class, const std::filesystem::path& linux_style_path) const;
+
 	};
 }
 

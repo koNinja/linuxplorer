@@ -1,6 +1,7 @@
 #include <engine/helpers/path_helper.hpp>
 
 #include <string>
+#include <regex>
 #include <cwctype>
 #include <algorithm>
 
@@ -116,5 +117,30 @@ namespace linuxplorer::engine::helpers {
 
 	const std::filesystem::path& path_helper::get_syncroot() const noexcept {
 		return this->m_syncroot;
+	}
+
+	bool path_helper::contains_invalid_ntfs_character(const std::filesystem::path& path) {
+		auto path_str = path.wstring();
+
+		static std::wregex invalid_pattern(LR"([<>:"/\\|?*])");
+
+		if (std::regex_search(path_str.cbegin(), path_str.cend(), invalid_pattern)) return true;
+
+		static std::wregex invalid_end_pattern(LR"([ \.]$)");
+		if (std::regex_search(path_str.cbegin(), path_str.cend(), invalid_end_pattern)) return true;
+
+		static std::wregex reserved_pattern(LR"(^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$)", std::regex_constants::icase);
+		if (std::regex_search(path_str.cbegin(), path_str.cend(), reserved_pattern)) return true;
+
+		return false;
+	}
+
+	std::filesystem::path path_helper::tolower_localized(const std::filesystem::path& path) {
+		auto s = path.wstring();
+		std::locale loc("");
+		std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) {
+			return std::tolower(c, loc); }
+		);
+		return s;
 	}
 }
