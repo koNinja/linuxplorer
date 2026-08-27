@@ -41,7 +41,8 @@ namespace linuxplorer::engine::services {
 		return has_initialized_once;
 	}
 	
-	profile_runtime::profile_runtime(const util::config::profile& profile) : m_profile(profile)
+	profile_runtime::profile_runtime(const util::config::profile& profile) : 
+		m_profile(profile.get_name(), std::filesystem::canonical(profile.get_syncroot()), profile.get_port(), profile.get_credential())
 	{
 		this->m_log_directory = util::config::configuration_manager::get_log_path() / profile.get_name();
 
