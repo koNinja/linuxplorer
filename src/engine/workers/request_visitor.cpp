@@ -514,7 +514,7 @@ namespace linuxplorer::engine::workers {
 				);
 				metadata.set_identity({ std::byte(0) });
 
-				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower_localized(placeholder_name);
+				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower(placeholder_name);
 				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
 					LOG_WARNING(
 						this->m_logger,
@@ -772,7 +772,7 @@ namespace linuxplorer::engine::workers {
 					file_times
 				);
 
-				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower_localized(placeholder_name.wstring());
+				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower(placeholder_name.wstring());
 				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
 					LOG_WARNING(
 						this->m_logger,
@@ -825,7 +825,7 @@ namespace linuxplorer::engine::workers {
 		try {
 			auto local_placeholder_names_lower = std::filesystem::directory_iterator(request.get_absolute_path()) |
 				std::ranges::views::transform([](const std::filesystem::directory_entry& entry) {
-					return std::filesystem::path(helpers::path_helper::tolower_localized(entry.path().wstring())).filename();
+					return std::filesystem::path(helpers::path_helper::tolower(entry.path().wstring())).filename();
 				}) | std::ranges::to<std::unordered_set>();
 
 			for (const auto& enumerated_entry : request.get_placeholder_set()) {
@@ -835,7 +835,7 @@ namespace linuxplorer::engine::workers {
 				}
 
 				auto enumerated_entry_path = request.get_absolute_path() / enumerated_entry.get_relative_path();
-				auto enumerated_entry_name_lower = std::filesystem::path(helpers::path_helper::tolower_localized(enumerated_entry.get_relative_path().wstring()));
+				auto enumerated_entry_name_lower = std::filesystem::path(helpers::path_helper::tolower(enumerated_entry.get_relative_path().wstring()));
 
 				if (local_placeholder_names_lower.contains(enumerated_entry_name_lower)) {
 					local_placeholder_names_lower.erase(enumerated_entry_name_lower);
