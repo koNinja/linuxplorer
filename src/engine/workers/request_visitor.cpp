@@ -166,12 +166,63 @@ namespace linuxplorer::engine::workers {
 				break;
 			};
 
-			std::ifstream ifs(absolute_client_path, std::ios::binary);
-			if (!ifs) {
+			win32::unique_file_handle local_file_handle;
+
+			constexpr int max_open_attempts = 3;
+			constexpr auto open_attempt_duration = std::chrono::milliseconds(100);
+
+			int i = 1;
+			while (true) {
+				local_file_handle = ::CreateFileW(
+					absolute_client_path.c_str(),
+					GENERIC_READ,
+					FILE_SHARE_READ,
+					nullptr,
+					OPEN_EXISTING,
+					FILE_ATTRIBUTE_NORMAL,
+					nullptr
+				);
+				if (local_file_handle) break;
+
+				std::error_code ec(::GetLastError(), std::system_category());
+
+				if (ec.value() != ERROR_SHARING_VIOLATION && ec.value() != ERROR_LOCK_VIOLATION) {
+					LOG_ERROR(
+						this->m_logger,
+						"Failed to open the file '{}' for reading. (Win32: {}({}))",
+						absolute_client_path,
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				i++;
+				if (i > max_open_attempts) {
+					LOG_ERROR(
+						this->m_logger,
+						"The number of attempts to open the file exceeded the limit, and failed to open the file handle. (Win32: {}({}))",
+						absolute_client_path,
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				std::this_thread::sleep_for(open_attempt_duration);
+			}
+			long offset_low = static_cast<long>(request.get_range().get_offset());
+			long offset_high = static_cast<long>(request.get_range().get_offset() << 32);
+			if (::SetFilePointer(local_file_handle.get(), offset_low, &offset_high, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
+				std::error_code ec(::GetLastError(), std::system_category());
 				LOG_ERROR(
 					this->m_logger,
-					"Failed to open the file '{}' for reading.",
-					absolute_client_path
+					"Failed to seek the file '{}' for reading. (Win32: {}({}))",
+					absolute_client_path,
+					ec.message(),
+					ec.value()
 				);
 
 				return models::requests::request_result::transient_failure;
@@ -187,7 +238,7 @@ namespace linuxplorer::engine::workers {
 						"Failed to open the file '{}' for reading.",
 						server_path
 					);
-					
+
 					return models::requests::request_result::transient_failure;
 				}
 
@@ -195,16 +246,29 @@ namespace linuxplorer::engine::workers {
 			}
 
 			auto& oss = *remote_stream_cache.get(frn);
-
-			if (ifs.tellg() != request.get_range().get_offset()) {
-				ifs.seekg(request.get_range().get_offset());
-			}
 			if (oss.tellp() != request.get_range().get_offset()) {
 				oss.seekp(request.get_range().get_offset());
 			}
 
 			std::vector<std::byte> buffer(request.get_range().get_length());
-			ifs.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+
+			::DWORD bytes_read = 0;
+			bool succeeded = ::ReadFile(local_file_handle.get(), buffer.data(), static_cast<::DWORD>(buffer.size()), &bytes_read, nullptr);
+			if (!succeeded || bytes_read < buffer.size()) {
+				std::error_code ec(::GetLastError(), std::system_category());
+				LOG_ERROR(
+					this->m_logger,
+					"Failed to read from the file '{}', offset: {}, length: {} (Win32: {}({}))",
+					server_path,
+					request.get_range().get_offset(),
+					request.get_range().get_length(),
+					ec.message(),
+					ec.value()
+				);
+
+				return models::requests::request_result::transient_failure;
+			}
+
 			oss.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
 
 			oss.flush();
