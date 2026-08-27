@@ -496,39 +496,48 @@ namespace linuxplorer::engine::workers {
 
 	void filesystem_watcher::raise_io_operations(const std::filesystem::path& relative_path, const models::usn::operation_recognizer& recognizer, std::optional<models::requests::remote::modification_type> type) {
 		auto absolute_path = this->m_absolute_watching_path / relative_path;
-		switch (recognizer.get_operation_type()) {
-		case models::usn::operation_recognizer::state::creation:
-		{
-			auto task = std::make_unique<models::operations::creation_operation>(this->m_absolute_watching_path, relative_path);
-			LOG_INFO(this->m_logger, "Detected creation of '{}'. (Operation: #{})", absolute_path, task->get_id());
-			this->m_execution_context.enqueue_task(std::move(task));
-			break;
+
+		try {
+			switch (recognizer.get_operation_type()) {
+			case models::usn::operation_recognizer::state::creation:
+			{
+				auto task = std::make_unique<models::operations::creation_operation>(this->m_absolute_watching_path, relative_path);
+				LOG_INFO(this->m_logger, "Detected creation of '{}'. (Operation: #{})", absolute_path, task->get_id());
+				this->m_execution_context.enqueue_task(std::move(task));
+				break;
+			}
+			case models::usn::operation_recognizer::state::modification:
+			{
+				auto task = std::make_unique<models::operations::modification_operation>(this->m_absolute_watching_path, relative_path, *type);
+				LOG_INFO(this->m_logger, "Detected modification of '{}'. (Operation: #{}, Modification type: {})", absolute_path, task->get_id(), std::to_underlying(*type));
+				this->m_execution_context.enqueue_task(std::move(task));
+				break;
+			}
+			case models::usn::operation_recognizer::state::import:
+			{
+				auto task = std::make_unique<models::operations::import_operation>(this->m_absolute_watching_path, relative_path);
+				LOG_INFO(this->m_logger, "Detected copy or move into the syncroot of '{}'. (Operation: #{})", absolute_path, task->get_id());
+				this->m_execution_context.enqueue_task(std::move(task));
+				break;
+			}
+			case models::usn::operation_recognizer::state::attribute:
+			{
+				if (!this->check_execution_necessity_for_attrop(absolute_path)) break;
+				auto task = std::make_unique<models::operations::attribute_operation>(this->m_absolute_watching_path, relative_path);
+				LOG_INFO(this->m_logger, "Detected attribute changes of '{}'. (Operation: #{})", absolute_path, task->get_id());
+				this->m_execution_context.enqueue_task(std::move(task));
+				break;
+			}
+			default:
+				LOG_INFO(this->m_logger, "Detected an unrecognized operation of '{}'", absolute_path);
+				break;
+			}
 		}
-		case models::usn::operation_recognizer::state::modification:
-		{
-			auto task = std::make_unique<models::operations::modification_operation>(this->m_absolute_watching_path, relative_path, *type);
-			LOG_INFO(this->m_logger, "Detected modification of '{}'. (Operation: #{}, Modification type: {})", absolute_path, task->get_id(), std::to_underlying(*type));
-			this->m_execution_context.enqueue_task(std::move(task));
-			break;
+		catch (const shell::cloud_provider_system_error& e) {
+			LOG_INFO(this->m_logger, "Failed a placeholder operation for '{}' to generate a task: {} (Win32: {}{})", absolute_path, e.what(), e.code().message(), e.code().value());
 		}
-		case models::usn::operation_recognizer::state::import:
-		{
-			auto task = std::make_unique<models::operations::import_operation>(this->m_absolute_watching_path, relative_path);
-			LOG_INFO(this->m_logger, "Detected copy or move into the syncroot of '{}'. (Operation: #{})", absolute_path, task->get_id());
-			this->m_execution_context.enqueue_task(std::move(task));
-			break;
-		}
-		case models::usn::operation_recognizer::state::attribute:
-		{
-			if (!this->check_execution_necessity_for_attrop(absolute_path)) break;
-			auto task = std::make_unique<models::operations::attribute_operation>(this->m_absolute_watching_path, relative_path);
-			LOG_INFO(this->m_logger, "Detected attribute changes of '{}'. (Operation: #{})", absolute_path, task->get_id());
-			this->m_execution_context.enqueue_task(std::move(task));
-			break;
-		}
-		default:
-			LOG_INFO(this->m_logger, "Detected an unrecognized operation of '{}'", absolute_path);
-			break;
+		catch (...) {
+			LOG_INFO(this->m_logger, "Failed to generate a task due to an unknown error: {}", absolute_path);
 		}
 	}
 
