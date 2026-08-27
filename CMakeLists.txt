@@ -4,7 +4,7 @@ if (NOT WIN32)
 	message(FATAL_ERROR "Linuxplorer is only supported on Windows.")
 endif()
 
-project(linuxplorer VERSION 2.0.0 LANGUAGES CXX)
+project(linuxplorer VERSION 2.0.1 LANGUAGES CXX)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 23)
