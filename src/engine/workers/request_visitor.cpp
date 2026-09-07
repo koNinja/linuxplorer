@@ -213,6 +213,7 @@ namespace linuxplorer::engine::workers {
 
 				std::this_thread::sleep_for(open_attempt_duration);
 			}
+
 			long offset_low = static_cast<long>(request.get_range().get_offset());
 			long offset_high = static_cast<long>(request.get_range().get_offset() << 32);
 			if (::SetFilePointer(local_file_handle.get(), offset_low, &offset_high, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
@@ -852,7 +853,7 @@ namespace linuxplorer::engine::workers {
 					placeholder.set_file_times(enumerated_entry.get_file_times());
 					auto identity_bytes_span = placeholder.get_identity();
 					placeholder.set_identity(std::vector<std::byte>(identity_bytes_span.begin(), identity_bytes_span.end()));
-					placeholder.set_marked_in_sync(true);
+					if (placeholder.is_marked_in_sync()) placeholder.set_marked_in_sync(true);
 
 					if (::GetFileAttributesW(enumerated_entry_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) {
 						placeholder.flush();
