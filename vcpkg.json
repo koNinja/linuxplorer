@@ -1,11 +1,12 @@
 {
-  "dependencies": [
-    "openssl",
-    "libssh2",
-    "gtest",
-    "nlohmann-json",
-    "boost-uuid",
-    "boost-program-options",
-    "quill"
-  ]
+	"dependencies": [
+		"openssl",
+		"libssh2",
+		"gtest",
+		"nlohmann-json",
+		"boost-uuid",
+		"boost-program-options",
+		"quill",
+		"wintoast"
+	]
 }
