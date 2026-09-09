@@ -1,5 +1,5 @@
 # linuxplorer
-**The portable SFTP client integrated with Windows Explorer.**
+**A portable SFTP client integrated with Windows.**
 
 ## Overview
 <img width="60%" alt="Screenshot 2026-01-17 155000" src="https://github.com/user-attachments/assets/4713f383-6fdf-460a-ac85-4d722a18c3b3" />
@@ -21,7 +21,7 @@ Linux files from Windows Explorer for personal use.
 - Propagation of client-side file changes to the server
 
 ## Requirements
-- Windows 10 1709 or higher
+- Windows 11 or higher
 
 ## Notes
 - Not as stable as commercial products (e.g. OneDrive, Dropbox)
@@ -57,7 +57,7 @@ Run the command with `--help` to see all available options.
 ```bash
 linuxplorer -p --create server1	# Create a profile 'server1'
 linuxplorer -c server1@credential=<host>,<username>,<password>	# Set a host, username and password
-linuxplorer -c server1@syncroot=C:\Users\user\server1	# Set a mount point
+linuxplorer -c server1@syncroot="C:\Users\user\server1"	# Set a mount point
 
 linuxplorer -i	# Start linuxplorer
 linuxplorer -t	# Stop linuxplorer
@@ -86,11 +86,11 @@ rmdir /s C:\Users\<username>\.linuxplorer  # All app data is stored here
 
 ## Build Environment (tested)
 This project uses CMake.
-- Windows 11
+- Windows 11 (25H2)
 - Visual Studio Code
-- Visual Studio 2022 (MSVC)
+- Visual Studio 2026 (MSVC)
 - Ninja build 1.13.2+
-- CMake 3.31+
+- CMake 4.3.0+
 - vcpkg (for dependencies)
 ### Dependencies
 - [Cloud Filter API (Win32)](https://learn.microsoft.com/en-us/windows/win32/api/_cloudapi/)
@@ -99,7 +99,8 @@ This project uses CMake.
 - [Boost](https://www.boost.org/)
 - [OpenSSL](https://www.openssl.org/)
 - [Quill](https://github.com/odygrd/quill)
-- [GoogleTest](https://github.com/google/googletest)
+- [WinToast](https://github.com/mohabouje/WinToast)
+- [GoogleTest (Used for tests)](https://github.com/google/googletest)
 
 ## License
 MIT License
