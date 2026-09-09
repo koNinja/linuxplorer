@@ -40,7 +40,7 @@ namespace linuxplorer::ssh::sftp {
 		if (!handle) {
 			throw ssh_invalid_operation_exception("null handle.");
 		}
-		this->m_handle = internal::unqiue_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
+		this->m_handle = internal::unique_sftp_handle_ptr(new internal::internal_sftp_handle_ptr_t(handle, session.get_weak()));
 	}
 
 	sftp_handle::sftp_handle(sftp_handle&& rhs) noexcept : m_handle(std::move(rhs.m_handle)) {

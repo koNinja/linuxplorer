@@ -95,7 +95,7 @@ namespace linuxplorer::ssh::sftp {
 	
 	class LINUXPLORER_SSH_API sftp_handle {
 	private:
-		internal::unqiue_sftp_handle_ptr m_handle;
+		internal::unique_sftp_handle_ptr m_handle;
 	public:
 		sftp_handle(const sftp_session& session, ::LIBSSH2_SFTP_HANDLE* handle);
 		sftp_handle(const sftp_handle&) = delete;
