@@ -214,21 +214,6 @@ namespace linuxplorer::engine::workers {
 				std::this_thread::sleep_for(open_attempt_duration);
 			}
 
-			long offset_low = static_cast<long>(request.get_range().get_offset());
-			long offset_high = static_cast<long>(request.get_range().get_offset() << 32);
-			if (::SetFilePointer(local_file_handle.get(), offset_low, &offset_high, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
-				std::error_code ec(::GetLastError(), std::system_category());
-				LOG_ERROR(
-					this->m_logger,
-					"Failed to seek the file '{}' for reading. (Win32: {}({}))",
-					absolute_client_path,
-					ec.message(),
-					ec.value()
-				);
-
-				return models::requests::request_result::transient_failure;
-			}
-
 			auto& remote_stream_cache = this->m_stream_cache.remote_ostream();
 			auto frn = win32::get_frn(absolute_client_path);
 			if (!remote_stream_cache.contains(frn) || remote_stream_cache.get(frn)->mode() != ostream_open_mode) {
@@ -253,21 +238,47 @@ namespace linuxplorer::engine::workers {
 
 			std::vector<std::byte> buffer(request.get_range().get_length());
 
-			::DWORD bytes_read = 0;
-			bool succeeded = ::ReadFile(local_file_handle.get(), buffer.data(), static_cast<::DWORD>(buffer.size()), &bytes_read, nullptr);
-			if (!succeeded || bytes_read < buffer.size()) {
-				std::error_code ec(::GetLastError(), std::system_category());
-				LOG_ERROR(
-					this->m_logger,
-					"Failed to read from the file '{}', offset: {}, length: {} (Win32: {}({}))",
-					server_path,
-					request.get_range().get_offset(),
-					request.get_range().get_length(),
-					ec.message(),
-					ec.value()
-				);
+			std::size_t bytes_read_in_total = 0;
+			while (bytes_read_in_total < request.get_range().get_length()) {
+				std::size_t pointer_offset_from_bof = request.get_range().get_offset() + bytes_read_in_total;
+				::LARGE_INTEGER nt_pointer_offset{};
+				nt_pointer_offset.QuadPart = pointer_offset_from_bof;
 
-				return models::requests::request_result::transient_failure;
+				if (!::SetFilePointerEx(local_file_handle.get(), nt_pointer_offset, nullptr, FILE_BEGIN)) {
+					std::error_code ec(::GetLastError(), std::system_category());
+					LOG_ERROR(
+						this->m_logger,
+						"Failed to seek the file '{}' for reading, offset from BOF: {} (Win32: {}({}))",
+						absolute_client_path,
+						pointer_offset_from_bof,
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				::DWORD bytes_to_read = static_cast<::DWORD>(
+					std::min(request.get_range().get_length() - bytes_read_in_total, static_cast<std::size_t>(std::numeric_limits<::DWORD>::max()))
+				);
+				::DWORD bytes_actually_read = 0;
+				bool succeeded = ::ReadFile(local_file_handle.get(), buffer.data() + bytes_read_in_total, bytes_to_read, &bytes_actually_read, nullptr);
+				if (!succeeded || bytes_actually_read < bytes_to_read) {
+					std::error_code ec(::GetLastError(), std::system_category());
+					LOG_ERROR(
+						this->m_logger,
+						"Failed to read from the file '{}', offset: {}, length: {} (Win32: {}({}))",
+						server_path,
+						request.get_range().get_offset(),
+						request.get_range().get_length(),
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				bytes_read_in_total += bytes_actually_read;
 			}
 
 			oss.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
