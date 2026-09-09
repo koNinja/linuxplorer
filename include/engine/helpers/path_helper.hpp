@@ -14,7 +14,7 @@ namespace linuxplorer::engine::helpers {
 	public:
 		static bool is_under(const std::filesystem::path& path, const std::filesystem::path& base);
 		static bool contains_invalid_ntfs_character(const std::filesystem::path& path);
-		static std::filesystem::path tolower_localized(const std::filesystem::path& path);
+		static std::filesystem::path tolower(const std::filesystem::path& path);
 	private:
 		std::filesystem::path m_syncroot;
 		std::filesystem::path m_linux_root;

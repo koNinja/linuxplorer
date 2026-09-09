@@ -90,13 +90,7 @@ namespace linuxplorer::engine::helpers {
 	bool path_helper::is_under(const std::filesystem::path& path, const std::filesystem::path& base) {
 		auto normalize = [](const std::filesystem::path& path)
 		{
-			auto p = path.lexically_normal();
-
-			std::wstring s = p.native();
-			std::transform(s.begin(), s.end(), s.begin(),
-				[](wchar_t c){ return std::towlower(c); });
-
-			return std::filesystem::path(s);
+			return path_helper::tolower(path.lexically_normal());
 		};
 
 		std::filesystem::path p = normalize(path);
@@ -135,11 +129,10 @@ namespace linuxplorer::engine::helpers {
 		return false;
 	}
 
-	std::filesystem::path path_helper::tolower_localized(const std::filesystem::path& path) {
+	std::filesystem::path path_helper::tolower(const std::filesystem::path& path) {
 		auto s = path.wstring();
-		std::locale loc("");
-		std::transform(s.begin(), s.end(), s.begin(), [&loc](wchar_t c) {
-			return std::tolower(c, loc); }
+		std::transform(s.begin(), s.end(), s.begin(), [](wchar_t c) {
+			return std::towlower(c); }
 		);
 		return s;
 	}

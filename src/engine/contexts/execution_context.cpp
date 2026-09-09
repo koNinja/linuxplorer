@@ -112,7 +112,7 @@ namespace linuxplorer::engine::contexts {
 	}
 
 	void execution_context::suppress_directory_update(const std::filesystem::path& relative_path_from_syncroot, bool recursively_suppress) {
-		auto lower_relative_path_elements = helpers::path_helper::tolower_localized(relative_path_from_syncroot) | std::ranges::to<std::vector<std::filesystem::path>>();
+		auto lower_relative_path_elements = helpers::path_helper::tolower(relative_path_from_syncroot) | std::ranges::to<std::vector<std::filesystem::path>>();
 		directory_update_suppression_context_node* node_ptr = &this->m_directory_update_suppressed.m_root;
 		for (int i = 0; const auto& lower_path_element : lower_relative_path_elements) {
 			node_ptr = &node_ptr->m_children[lower_path_element];
@@ -126,7 +126,7 @@ namespace linuxplorer::engine::contexts {
 	}
 
 	bool execution_context::is_directory_update_suppressed(const std::filesystem::path& relative_path_from_syncroot) {
-		auto lower_relative_path_elements = helpers::path_helper::tolower_localized(relative_path_from_syncroot) | std::ranges::to<std::vector<std::filesystem::path>>();
+		auto lower_relative_path_elements = helpers::path_helper::tolower(relative_path_from_syncroot) | std::ranges::to<std::vector<std::filesystem::path>>();
 		directory_update_suppression_context_node* node_ptr = &this->m_directory_update_suppressed.m_root;
 		for (int i = 0; const auto& lower_path_element : lower_relative_path_elements) {
 			if (node_ptr->m_instructions.has_value() && node_ptr->m_instructions->m_recursively_suppress) {
@@ -145,7 +145,7 @@ namespace linuxplorer::engine::contexts {
 	}
 
 	bool execution_context::try_release_directory_update_suppression(const std::filesystem::path& relative_path_from_syncroot) {
-		auto lower_relative_path_elements = helpers::path_helper::tolower_localized(relative_path_from_syncroot) | std::ranges::to<std::vector<std::filesystem::path>>();
+		auto lower_relative_path_elements = helpers::path_helper::tolower(relative_path_from_syncroot) | std::ranges::to<std::vector<std::filesystem::path>>();
 		directory_update_suppression_context_node* node_ptr = &this->m_directory_update_suppressed.m_root;
 		for (int i = 0; const auto& lower_path_element : lower_relative_path_elements) {
 			if (node_ptr->m_children.contains(lower_path_element)) {

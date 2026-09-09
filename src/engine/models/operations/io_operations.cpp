@@ -485,7 +485,8 @@ namespace linuxplorer::engine::models::operations {
 
 	bool import_operation::should_execute() const {
 		if (shell::filesystem::cloud_filter_placeholder::is_placeholder(this->get_absolute_path())) {
-			return false;
+			shell::filesystem::cloud_filter_placeholder placeholder(this->get_absolute_path());
+			if (placeholder.is_marked_in_sync()) return false;
 		}
 
 		return true;

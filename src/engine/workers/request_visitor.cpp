@@ -166,15 +166,52 @@ namespace linuxplorer::engine::workers {
 				break;
 			};
 
-			std::ifstream ifs(absolute_client_path, std::ios::binary);
-			if (!ifs) {
-				LOG_ERROR(
-					this->m_logger,
-					"Failed to open the file '{}' for reading.",
-					absolute_client_path
-				);
+			win32::unique_file_handle local_file_handle;
 
-				return models::requests::request_result::transient_failure;
+			constexpr int max_open_attempts = 3;
+			constexpr auto open_attempt_duration = std::chrono::milliseconds(100);
+
+			int i = 1;
+			while (true) {
+				local_file_handle = ::CreateFileW(
+					absolute_client_path.c_str(),
+					GENERIC_READ,
+					FILE_SHARE_READ,
+					nullptr,
+					OPEN_EXISTING,
+					FILE_ATTRIBUTE_NORMAL,
+					nullptr
+				);
+				if (local_file_handle) break;
+
+				std::error_code ec(::GetLastError(), std::system_category());
+
+				if (ec.value() != ERROR_SHARING_VIOLATION && ec.value() != ERROR_LOCK_VIOLATION) {
+					LOG_ERROR(
+						this->m_logger,
+						"Failed to open the file '{}' for reading. (Win32: {}({}))",
+						absolute_client_path,
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				i++;
+				if (i > max_open_attempts) {
+					LOG_ERROR(
+						this->m_logger,
+						"The number of attempts to open the file exceeded the limit, and failed to open the file handle. (Win32: {}({}))",
+						absolute_client_path,
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				std::this_thread::sleep_for(open_attempt_duration);
 			}
 
 			auto& remote_stream_cache = this->m_stream_cache.remote_ostream();
@@ -187,7 +224,7 @@ namespace linuxplorer::engine::workers {
 						"Failed to open the file '{}' for reading.",
 						server_path
 					);
-					
+
 					return models::requests::request_result::transient_failure;
 				}
 
@@ -195,16 +232,55 @@ namespace linuxplorer::engine::workers {
 			}
 
 			auto& oss = *remote_stream_cache.get(frn);
-
-			if (ifs.tellg() != request.get_range().get_offset()) {
-				ifs.seekg(request.get_range().get_offset());
-			}
 			if (oss.tellp() != request.get_range().get_offset()) {
 				oss.seekp(request.get_range().get_offset());
 			}
 
 			std::vector<std::byte> buffer(request.get_range().get_length());
-			ifs.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+
+			std::size_t bytes_read_in_total = 0;
+			while (bytes_read_in_total < request.get_range().get_length()) {
+				std::size_t pointer_offset_from_bof = request.get_range().get_offset() + bytes_read_in_total;
+				::LARGE_INTEGER nt_pointer_offset{};
+				nt_pointer_offset.QuadPart = pointer_offset_from_bof;
+
+				if (!::SetFilePointerEx(local_file_handle.get(), nt_pointer_offset, nullptr, FILE_BEGIN)) {
+					std::error_code ec(::GetLastError(), std::system_category());
+					LOG_ERROR(
+						this->m_logger,
+						"Failed to seek the file '{}' for reading, offset from BOF: {} (Win32: {}({}))",
+						absolute_client_path,
+						pointer_offset_from_bof,
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				::DWORD bytes_to_read = static_cast<::DWORD>(
+					std::min(request.get_range().get_length() - bytes_read_in_total, static_cast<std::size_t>(std::numeric_limits<::DWORD>::max()))
+				);
+				::DWORD bytes_actually_read = 0;
+				bool succeeded = ::ReadFile(local_file_handle.get(), buffer.data() + bytes_read_in_total, bytes_to_read, &bytes_actually_read, nullptr);
+				if (!succeeded || bytes_actually_read < bytes_to_read) {
+					std::error_code ec(::GetLastError(), std::system_category());
+					LOG_ERROR(
+						this->m_logger,
+						"Failed to read from the file '{}', offset: {}, length: {} (Win32: {}({}))",
+						server_path,
+						request.get_range().get_offset(),
+						request.get_range().get_length(),
+						ec.message(),
+						ec.value()
+					);
+
+					return models::requests::request_result::transient_failure;
+				}
+
+				bytes_read_in_total += bytes_actually_read;
+			}
+
 			oss.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
 
 			oss.flush();
@@ -450,7 +526,7 @@ namespace linuxplorer::engine::workers {
 				);
 				metadata.set_identity({ std::byte(0) });
 
-				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower_localized(placeholder_name);
+				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower(placeholder_name);
 				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
 					LOG_WARNING(
 						this->m_logger,
@@ -708,7 +784,7 @@ namespace linuxplorer::engine::workers {
 					file_times
 				);
 
-				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower_localized(placeholder_name.wstring());
+				std::filesystem::path placeholder_name_lower = helpers::path_helper::tolower(placeholder_name.wstring());
 				if (existent_files_in_server_lower.contains(placeholder_name_lower)) {
 					LOG_WARNING(
 						this->m_logger,
@@ -761,7 +837,7 @@ namespace linuxplorer::engine::workers {
 		try {
 			auto local_placeholder_names_lower = std::filesystem::directory_iterator(request.get_absolute_path()) |
 				std::ranges::views::transform([](const std::filesystem::directory_entry& entry) {
-					return std::filesystem::path(helpers::path_helper::tolower_localized(entry.path().wstring())).filename();
+					return std::filesystem::path(helpers::path_helper::tolower(entry.path().wstring())).filename();
 				}) | std::ranges::to<std::unordered_set>();
 
 			for (const auto& enumerated_entry : request.get_placeholder_set()) {
@@ -771,7 +847,7 @@ namespace linuxplorer::engine::workers {
 				}
 
 				auto enumerated_entry_path = request.get_absolute_path() / enumerated_entry.get_relative_path();
-				auto enumerated_entry_name_lower = std::filesystem::path(helpers::path_helper::tolower_localized(enumerated_entry.get_relative_path().wstring()));
+				auto enumerated_entry_name_lower = std::filesystem::path(helpers::path_helper::tolower(enumerated_entry.get_relative_path().wstring()));
 
 				if (local_placeholder_names_lower.contains(enumerated_entry_name_lower)) {
 					local_placeholder_names_lower.erase(enumerated_entry_name_lower);
@@ -788,7 +864,7 @@ namespace linuxplorer::engine::workers {
 					placeholder.set_file_times(enumerated_entry.get_file_times());
 					auto identity_bytes_span = placeholder.get_identity();
 					placeholder.set_identity(std::vector<std::byte>(identity_bytes_span.begin(), identity_bytes_span.end()));
-					placeholder.set_marked_in_sync(true);
+					if (placeholder.is_marked_in_sync()) placeholder.set_marked_in_sync(true);
 
 					if (::GetFileAttributesW(enumerated_entry_path.c_str()) & FILE_ATTRIBUTE_DIRECTORY) {
 						placeholder.flush();
