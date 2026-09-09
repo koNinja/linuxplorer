@@ -73,7 +73,7 @@ namespace linuxplorer::ssh::sftp {
 			}
 		};
 
-		using unqiue_sftp_handle_ptr = std::unique_ptr<internal_sftp_handle_ptr_t, sftp_handle_delete>;
+		using unique_sftp_handle_ptr = std::unique_ptr<internal_sftp_handle_ptr_t, sftp_handle_delete>;
 	}
 	
 	class LINUXPLORER_SSH_API sftp_session {
